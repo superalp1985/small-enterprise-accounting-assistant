@@ -1,0 +1,72 @@
+{
+  "app": {
+    "name": "小企业会计智能记账报税工具",
+    "version": "1.7.0",
+    "locale": "zh-CN",
+    "organization": "",
+    "organizationType": "小企业"
+  },
+  "runtime": {
+    "llamaServerPath": "runtime/llama_cpp/llama-server.exe",
+    "llamaCudaServerPath": "runtime/llama_cpp_cuda/llama-server.exe"
+  },
+  "models": {
+    "semantic": {
+      "provider": "llama_cpp_server",
+      "name": "Qwen3.5-2B-Q4_K_M",
+      "modelPath": "models/qwen3.5-2b-q4km/Qwen3.5-2B-Q4_K_M.gguf",
+      "host": "127.0.0.1",
+      "port": 18083,
+      "contextSize": 4096,
+      "threads": 4,
+      "threadsBatch": 0,
+      "batchSize": 512,
+      "ubatchSize": 128,
+      "cachePrompt": true,
+      "cacheReuse": 0,
+      "maxTokens": 256,
+      "temperature": 0.0,
+      "preferGPU": true,
+      "gpuLayers": "all",
+      "flashAttention": "auto",
+      "reasoning": false,
+      "startupTimeout": 120
+    },
+    "ocr": {
+      "provider": "rapidocr",
+      "enabled": true,
+      "lowConfidenceThreshold": 0.85,
+      "pythonVersion": "3.12",
+      "adapterPath": "runtime/ocr/bin/rapidocr_adapter.py",
+      "outputDir": "out/ocr"
+    }
+  },
+  "matching": {
+    "useSemanticLibrary": true,
+    "useAIModel": true,
+    "aiFallbackThreshold": 0.6,
+    "maxAICandidates": 5
+  },
+  "accounting": {
+    "defaultProfile": "enterprise",
+    "profiles": {
+      "enterprise": {
+        "label": "小企业会计",
+        "type": "small_enterprise",
+        "standards": ["小企业会计准则"],
+        "accountCatalogPath": "account_catalog_small_enterprise.json",
+        "vocabPath": "vocab_library_small_enterprise.json",
+        "semanticCategoriesPath": "semantic_categories_small_enterprise.json",
+        "dataDir": "data/small_enterprise"
+      }
+    },
+    "requireLogin": true,
+    "enableAuditLog": true,
+    "autoBalanceCheck": true
+  },
+  "ui": {
+    "theme": "professional",
+    "autoSave": true,
+    "autoSaveInterval": 300
+  }
+}

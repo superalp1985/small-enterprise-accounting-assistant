@@ -1,0 +1,41 @@
+name: 功能建议
+description: 提议符合项目定位的新功能或流程改进
+title: "[Feature] "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    attributes:
+      label: 用户场景
+      description: 说明一人公司或小企业在什么完整流程中遇到问题
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 建议方案
+      description: 说明预期输入、操作和输出
+    validations:
+      required: true
+  - type: dropdown
+    attributes:
+      label: 涉及范围
+      options:
+        - 记账与凭证
+        - OCR 与批量导入
+        - 自然语义与词库
+        - 月结、资产与往来
+        - 税务准备与 Excel 导出
+        - 数据安全与备份
+        - 安装、性能与兼容性
+        - 文档
+    validations:
+      required: true
+  - type: checkboxes
+    attributes:
+      label: 边界确认
+      options:
+        - label: 该建议仍将软件定位为记账和报税准备辅助，不承诺代替专业判断或直接申报
+          required: true
+        - label: 我没有附带真实企业、票据或个人敏感数据
+          required: true
+

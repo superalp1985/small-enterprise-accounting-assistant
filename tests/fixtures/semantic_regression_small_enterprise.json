@@ -1,0 +1,1258 @@
+[
+  {
+    "text": "库存现金",
+    "subject_code": "1001"
+  },
+  {
+    "text": "现金",
+    "subject_code": "1001"
+  },
+  {
+    "text": "备用金",
+    "subject_code": "1001"
+  },
+  {
+    "text": "银行存款",
+    "subject_code": "1002"
+  },
+  {
+    "text": "对公账户",
+    "subject_code": "1002"
+  },
+  {
+    "text": "基本户",
+    "subject_code": "1002"
+  },
+  {
+    "text": "其他货币资金",
+    "subject_code": "1012"
+  },
+  {
+    "text": "支付宝企业账户",
+    "subject_code": "1012"
+  },
+  {
+    "text": "微信商户余额",
+    "subject_code": "1012"
+  },
+  {
+    "text": "短期投资",
+    "subject_code": "1101"
+  },
+  {
+    "text": "短期理财投资",
+    "subject_code": "1101"
+  },
+  {
+    "text": "一年内变现投资",
+    "subject_code": "1101"
+  },
+  {
+    "text": "应收票据",
+    "subject_code": "1121"
+  },
+  {
+    "text": "收到商业汇票",
+    "subject_code": "1121"
+  },
+  {
+    "text": "应收银行承兑",
+    "subject_code": "1121"
+  },
+  {
+    "text": "应收账款",
+    "subject_code": "1122"
+  },
+  {
+    "text": "客户欠款",
+    "subject_code": "1122"
+  },
+  {
+    "text": "销售应收款",
+    "subject_code": "1122"
+  },
+  {
+    "text": "预付账款",
+    "subject_code": "1123"
+  },
+  {
+    "text": "预付款",
+    "subject_code": "1123"
+  },
+  {
+    "text": "预付货款",
+    "subject_code": "1123"
+  },
+  {
+    "text": "应收股利",
+    "subject_code": "1131"
+  },
+  {
+    "text": "应收现金股利",
+    "subject_code": "1131"
+  },
+  {
+    "text": "已宣告未收股利",
+    "subject_code": "1131"
+  },
+  {
+    "text": "应收利息",
+    "subject_code": "1132"
+  },
+  {
+    "text": "应收债券利息",
+    "subject_code": "1132"
+  },
+  {
+    "text": "已计未收利息",
+    "subject_code": "1132"
+  },
+  {
+    "text": "其他应收款",
+    "subject_code": "1221"
+  },
+  {
+    "text": "员工借款",
+    "subject_code": "1221"
+  },
+  {
+    "text": "支付押金",
+    "subject_code": "1221"
+  },
+  {
+    "text": "材料采购",
+    "subject_code": "1401"
+  },
+  {
+    "text": "计划成本采购材料",
+    "subject_code": "1401"
+  },
+  {
+    "text": "材料采购在途核算",
+    "subject_code": "1401"
+  },
+  {
+    "text": "在途物资",
+    "subject_code": "1402"
+  },
+  {
+    "text": "已付款未到货",
+    "subject_code": "1402"
+  },
+  {
+    "text": "已开票未入库",
+    "subject_code": "1402"
+  },
+  {
+    "text": "原材料",
+    "subject_code": "1403"
+  },
+  {
+    "text": "生产材料入库",
+    "subject_code": "1403"
+  },
+  {
+    "text": "原料库存",
+    "subject_code": "1403"
+  },
+  {
+    "text": "材料成本差异",
+    "subject_code": "1404"
+  },
+  {
+    "text": "材料计划实际差异",
+    "subject_code": "1404"
+  },
+  {
+    "text": "材料成本节约差",
+    "subject_code": "1404"
+  },
+  {
+    "text": "库存商品",
+    "subject_code": "1405"
+  },
+  {
+    "text": "商品库存",
+    "subject_code": "1405"
+  },
+  {
+    "text": "存货",
+    "subject_code": "1405"
+  },
+  {
+    "text": "商品进销差价",
+    "subject_code": "1407"
+  },
+  {
+    "text": "商品售价进价差",
+    "subject_code": "1407"
+  },
+  {
+    "text": "进销差价",
+    "subject_code": "1407"
+  },
+  {
+    "text": "委托加工物资",
+    "subject_code": "1408"
+  },
+  {
+    "text": "委外加工材料",
+    "subject_code": "1408"
+  },
+  {
+    "text": "外发加工物资",
+    "subject_code": "1408"
+  },
+  {
+    "text": "周转材料",
+    "subject_code": "1411"
+  },
+  {
+    "text": "低值易耗品",
+    "subject_code": "1411"
+  },
+  {
+    "text": "包装物周转",
+    "subject_code": "1411"
+  },
+  {
+    "text": "消耗性生物资产",
+    "subject_code": "1421"
+  },
+  {
+    "text": "待售生物资产",
+    "subject_code": "1421"
+  },
+  {
+    "text": "养殖存栏资产",
+    "subject_code": "1421"
+  },
+  {
+    "text": "长期债券投资",
+    "subject_code": "1501"
+  },
+  {
+    "text": "长期持有债券",
+    "subject_code": "1501"
+  },
+  {
+    "text": "一年以上债券投资",
+    "subject_code": "1501"
+  },
+  {
+    "text": "长期股权投资",
+    "subject_code": "1511"
+  },
+  {
+    "text": "长期股权出资",
+    "subject_code": "1511"
+  },
+  {
+    "text": "持有被投企业股权",
+    "subject_code": "1511"
+  },
+  {
+    "text": "固定资产",
+    "subject_code": "1601"
+  },
+  {
+    "text": "机器设备",
+    "subject_code": "1601"
+  },
+  {
+    "text": "办公设备",
+    "subject_code": "1601"
+  },
+  {
+    "text": "累计折旧",
+    "subject_code": "1602"
+  },
+  {
+    "text": "固定资产折旧",
+    "subject_code": "1602"
+  },
+  {
+    "text": "设备折旧",
+    "subject_code": "1602"
+  },
+  {
+    "text": "在建工程",
+    "subject_code": "1604"
+  },
+  {
+    "text": "未完工建设项目",
+    "subject_code": "1604"
+  },
+  {
+    "text": "安装工程成本",
+    "subject_code": "1604"
+  },
+  {
+    "text": "工程物资",
+    "subject_code": "1605"
+  },
+  {
+    "text": "工程专用材料",
+    "subject_code": "1605"
+  },
+  {
+    "text": "基建物资",
+    "subject_code": "1605"
+  },
+  {
+    "text": "固定资产清理",
+    "subject_code": "1606"
+  },
+  {
+    "text": "处置固定资产",
+    "subject_code": "1606"
+  },
+  {
+    "text": "报废设备清理",
+    "subject_code": "1606"
+  },
+  {
+    "text": "生产性生物资产",
+    "subject_code": "1621"
+  },
+  {
+    "text": "产果生物资产",
+    "subject_code": "1621"
+  },
+  {
+    "text": "役畜资产",
+    "subject_code": "1621"
+  },
+  {
+    "text": "生产性生物资产累计折旧",
+    "subject_code": "1622"
+  },
+  {
+    "text": "生产性生物资产折旧",
+    "subject_code": "1622"
+  },
+  {
+    "text": "经济林累计折旧",
+    "subject_code": "1622"
+  },
+  {
+    "text": "无形资产",
+    "subject_code": "1701"
+  },
+  {
+    "text": "软件资产",
+    "subject_code": "1701"
+  },
+  {
+    "text": "专利权",
+    "subject_code": "1701"
+  },
+  {
+    "text": "累计摊销",
+    "subject_code": "1702"
+  },
+  {
+    "text": "无形资产摊销",
+    "subject_code": "1702"
+  },
+  {
+    "text": "软件累计摊销",
+    "subject_code": "1702"
+  },
+  {
+    "text": "长期待摊费用",
+    "subject_code": "1801"
+  },
+  {
+    "text": "长期分摊费用",
+    "subject_code": "1801"
+  },
+  {
+    "text": "装修费长期摊销",
+    "subject_code": "1801"
+  },
+  {
+    "text": "待处理财产损溢",
+    "subject_code": "1901"
+  },
+  {
+    "text": "财产盘盈待处理",
+    "subject_code": "1901"
+  },
+  {
+    "text": "财产盘亏待处理",
+    "subject_code": "1901"
+  },
+  {
+    "text": "短期借款",
+    "subject_code": "2001"
+  },
+  {
+    "text": "银行短期贷款",
+    "subject_code": "2001"
+  },
+  {
+    "text": "流动资金借款",
+    "subject_code": "2001"
+  },
+  {
+    "text": "应付票据",
+    "subject_code": "2201"
+  },
+  {
+    "text": "开出商业汇票",
+    "subject_code": "2201"
+  },
+  {
+    "text": "应付银行承兑",
+    "subject_code": "2201"
+  },
+  {
+    "text": "应付账款",
+    "subject_code": "2202"
+  },
+  {
+    "text": "供应商欠款",
+    "subject_code": "2202"
+  },
+  {
+    "text": "采购应付款",
+    "subject_code": "2202"
+  },
+  {
+    "text": "预收账款",
+    "subject_code": "2203"
+  },
+  {
+    "text": "预收款",
+    "subject_code": "2203"
+  },
+  {
+    "text": "客户预付款",
+    "subject_code": "2203"
+  },
+  {
+    "text": "应付职工薪酬",
+    "subject_code": "2211"
+  },
+  {
+    "text": "应付工资",
+    "subject_code": "2211"
+  },
+  {
+    "text": "应付社保",
+    "subject_code": "2211"
+  },
+  {
+    "text": "应交税费",
+    "subject_code": "2221"
+  },
+  {
+    "text": "应交增值税",
+    "subject_code": "2221"
+  },
+  {
+    "text": "应交所得税",
+    "subject_code": "2221"
+  },
+  {
+    "text": "应付利息",
+    "subject_code": "2231"
+  },
+  {
+    "text": "应付借款利息",
+    "subject_code": "2231"
+  },
+  {
+    "text": "已计未付利息",
+    "subject_code": "2231"
+  },
+  {
+    "text": "应付利润",
+    "subject_code": "2232"
+  },
+  {
+    "text": "应付股东利润",
+    "subject_code": "2232"
+  },
+  {
+    "text": "已分配未付利润",
+    "subject_code": "2232"
+  },
+  {
+    "text": "其他应付款",
+    "subject_code": "2241"
+  },
+  {
+    "text": "股东垫款",
+    "subject_code": "2241"
+  },
+  {
+    "text": "暂收款",
+    "subject_code": "2241"
+  },
+  {
+    "text": "递延收益",
+    "subject_code": "2401"
+  },
+  {
+    "text": "递延补助收益",
+    "subject_code": "2401"
+  },
+  {
+    "text": "待以后确认收益",
+    "subject_code": "2401"
+  },
+  {
+    "text": "长期借款",
+    "subject_code": "2501"
+  },
+  {
+    "text": "一年以上银行借款",
+    "subject_code": "2501"
+  },
+  {
+    "text": "长期贷款本金",
+    "subject_code": "2501"
+  },
+  {
+    "text": "长期应付款",
+    "subject_code": "2701"
+  },
+  {
+    "text": "融资租赁应付款",
+    "subject_code": "2701"
+  },
+  {
+    "text": "分期购置资产款",
+    "subject_code": "2701"
+  },
+  {
+    "text": "实收资本",
+    "subject_code": "3001"
+  },
+  {
+    "text": "股东出资",
+    "subject_code": "3001"
+  },
+  {
+    "text": "注册资本",
+    "subject_code": "3001"
+  },
+  {
+    "text": "资本公积",
+    "subject_code": "3002"
+  },
+  {
+    "text": "资本溢价",
+    "subject_code": "3002"
+  },
+  {
+    "text": "股本溢价",
+    "subject_code": "3002"
+  },
+  {
+    "text": "盈余公积",
+    "subject_code": "3101"
+  },
+  {
+    "text": "法定盈余公积",
+    "subject_code": "3101"
+  },
+  {
+    "text": "任意盈余公积",
+    "subject_code": "3101"
+  },
+  {
+    "text": "本年利润",
+    "subject_code": "3103"
+  },
+  {
+    "text": "当年利润",
+    "subject_code": "3103"
+  },
+  {
+    "text": "年度利润",
+    "subject_code": "3103"
+  },
+  {
+    "text": "利润分配",
+    "subject_code": "3104"
+  },
+  {
+    "text": "未分配利润",
+    "subject_code": "3104"
+  },
+  {
+    "text": "股东分红",
+    "subject_code": "3104"
+  },
+  {
+    "text": "生产成本",
+    "subject_code": "4001"
+  },
+  {
+    "text": "产品成本",
+    "subject_code": "4001"
+  },
+  {
+    "text": "制造成本",
+    "subject_code": "4001"
+  },
+  {
+    "text": "制造费用",
+    "subject_code": "4101"
+  },
+  {
+    "text": "车间间接费用",
+    "subject_code": "4101"
+  },
+  {
+    "text": "生产设备折旧费",
+    "subject_code": "4101"
+  },
+  {
+    "text": "研发支出",
+    "subject_code": "4301"
+  },
+  {
+    "text": "研究开发费",
+    "subject_code": "4301"
+  },
+  {
+    "text": "研发费用",
+    "subject_code": "4301"
+  },
+  {
+    "text": "工程施工",
+    "subject_code": "4401"
+  },
+  {
+    "text": "建筑合同施工成本",
+    "subject_code": "4401"
+  },
+  {
+    "text": "合同工程毛利",
+    "subject_code": "4401"
+  },
+  {
+    "text": "机械作业",
+    "subject_code": "4403"
+  },
+  {
+    "text": "施工机械作业成本",
+    "subject_code": "4403"
+  },
+  {
+    "text": "机械台班费用",
+    "subject_code": "4403"
+  },
+  {
+    "text": "主营业务收入",
+    "subject_code": "5001"
+  },
+  {
+    "text": "销售收入",
+    "subject_code": "5001"
+  },
+  {
+    "text": "服务收入",
+    "subject_code": "5001"
+  },
+  {
+    "text": "其他业务收入",
+    "subject_code": "5051"
+  },
+  {
+    "text": "其他营业收入",
+    "subject_code": "5051"
+  },
+  {
+    "text": "非主营收入",
+    "subject_code": "5051"
+  },
+  {
+    "text": "投资收益",
+    "subject_code": "5111"
+  },
+  {
+    "text": "股权投资收益",
+    "subject_code": "5111"
+  },
+  {
+    "text": "债券投资收益",
+    "subject_code": "5111"
+  },
+  {
+    "text": "营业外收入",
+    "subject_code": "5301"
+  },
+  {
+    "text": "非经营收入",
+    "subject_code": "5301"
+  },
+  {
+    "text": "偶发收入",
+    "subject_code": "5301"
+  },
+  {
+    "text": "主营业务成本",
+    "subject_code": "5401"
+  },
+  {
+    "text": "销售成本",
+    "subject_code": "5401"
+  },
+  {
+    "text": "服务成本",
+    "subject_code": "5401"
+  },
+  {
+    "text": "其他业务成本",
+    "subject_code": "5402"
+  },
+  {
+    "text": "出租业务成本",
+    "subject_code": "5402"
+  },
+  {
+    "text": "销售材料成本",
+    "subject_code": "5402"
+  },
+  {
+    "text": "税金及附加",
+    "subject_code": "5403"
+  },
+  {
+    "text": "附加税费",
+    "subject_code": "5403"
+  },
+  {
+    "text": "城建税",
+    "subject_code": "5403"
+  },
+  {
+    "text": "销售费用",
+    "subject_code": "5601"
+  },
+  {
+    "text": "营销费用",
+    "subject_code": "5601"
+  },
+  {
+    "text": "推广费用",
+    "subject_code": "5601"
+  },
+  {
+    "text": "差旅费",
+    "subject_code": "5602"
+  },
+  {
+    "text": "出差费",
+    "subject_code": "5602"
+  },
+  {
+    "text": "旅差费",
+    "subject_code": "5602"
+  },
+  {
+    "text": "财务费用",
+    "subject_code": "5603"
+  },
+  {
+    "text": "利息支出",
+    "subject_code": "5603"
+  },
+  {
+    "text": "银行手续费",
+    "subject_code": "5603"
+  },
+  {
+    "text": "营业外支出",
+    "subject_code": "5711"
+  },
+  {
+    "text": "非经营支出",
+    "subject_code": "5711"
+  },
+  {
+    "text": "损失",
+    "subject_code": "5711"
+  },
+  {
+    "text": "所得税费用",
+    "subject_code": "5801"
+  },
+  {
+    "text": "企业所得税费用",
+    "subject_code": "5801"
+  },
+  {
+    "text": "所得税",
+    "subject_code": "5801"
+  },
+  {
+    "text": "政府补助",
+    "subject_code": "5301"
+  },
+  {
+    "text": "财政补贴",
+    "subject_code": "5301"
+  },
+  {
+    "text": "稳岗补贴",
+    "subject_code": "5301"
+  },
+  {
+    "text": "政府奖励",
+    "subject_code": "5301"
+  },
+  {
+    "text": "收到财政局补贴",
+    "subject_code": "5301"
+  },
+  {
+    "text": "平台待结算款",
+    "subject_code": "1012",
+    "subject_detail": "平台待结算款",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "抖店货款待结算",
+    "subject_code": "1012",
+    "subject_detail": "平台待结算款",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "快手小店货款待结算",
+    "subject_code": "1012",
+    "subject_detail": "平台待结算款",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "微信小店货款待结算",
+    "subject_code": "1012",
+    "subject_detail": "平台待结算款",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "小红书店铺货款待结算",
+    "subject_code": "1012",
+    "subject_detail": "平台待结算款",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "淘宝直播货款待结算",
+    "subject_code": "1012",
+    "subject_detail": "平台待结算款",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "平台佣金待提现",
+    "subject_code": "1012",
+    "subject_detail": "平台待结算款",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "平台商品销售收入",
+    "subject_code": "5001",
+    "subject_detail": "平台商品销售",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "抖店自营商品销售",
+    "subject_code": "5001",
+    "subject_detail": "平台商品销售",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "快手小店自营商品销售",
+    "subject_code": "5001",
+    "subject_detail": "平台商品销售",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "微信小店自营商品销售",
+    "subject_code": "5001",
+    "subject_detail": "平台商品销售",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "小红书店铺商品销售",
+    "subject_code": "5001",
+    "subject_detail": "平台商品销售",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "淘宝直播店铺商品销售",
+    "subject_code": "5001",
+    "subject_detail": "平台商品销售",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "直播间自营商品销售",
+    "subject_code": "5001",
+    "subject_detail": "平台商品销售",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "平台带货佣金收入",
+    "subject_code": "5001",
+    "subject_detail": "平台带货佣金",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "巨量百应带货佣金",
+    "subject_code": "5001",
+    "subject_detail": "平台带货佣金",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "精选联盟带货佣金",
+    "subject_code": "5001",
+    "subject_detail": "平台带货佣金",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "快分销带货佣金",
+    "subject_code": "5001",
+    "subject_detail": "平台带货佣金",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "优选联盟带货佣金",
+    "subject_code": "5001",
+    "subject_detail": "平台带货佣金",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "小红书买手合作佣金",
+    "subject_code": "5001",
+    "subject_detail": "平台带货佣金",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "B站悬赏带货佣金",
+    "subject_code": "5001",
+    "subject_detail": "平台带货佣金",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "淘宝联盟带货佣金",
+    "subject_code": "5001",
+    "subject_detail": "平台带货佣金",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "热浪引擎带货佣金",
+    "subject_code": "5001",
+    "subject_detail": "平台带货佣金",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "内容商业合作收入",
+    "subject_code": "5001",
+    "subject_detail": "内容商业合作",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "巨量星图商单收入",
+    "subject_code": "5001",
+    "subject_detail": "内容商业合作",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "磁力聚星商单收入",
+    "subject_code": "5001",
+    "subject_detail": "内容商业合作",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "腾讯互选广告收入",
+    "subject_code": "5001",
+    "subject_detail": "内容商业合作",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "小红书蒲公英商单收入",
+    "subject_code": "5001",
+    "subject_detail": "内容商业合作",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "B站花火商单收入",
+    "subject_code": "5001",
+    "subject_detail": "内容商业合作",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "品牌定制视频收入",
+    "subject_code": "5001",
+    "subject_detail": "内容商业合作",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "创作者激励与打赏收入",
+    "subject_code": "5001",
+    "subject_detail": "创作者激励与打赏",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "B站创作激励收入",
+    "subject_code": "5001",
+    "subject_detail": "创作者激励与打赏",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "B站充电收入",
+    "subject_code": "5001",
+    "subject_detail": "创作者激励与打赏",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "B站直播打赏收入",
+    "subject_code": "5001",
+    "subject_detail": "创作者激励与打赏",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "抖音直播打赏收入",
+    "subject_code": "5001",
+    "subject_detail": "创作者激励与打赏",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "快手直播打赏收入",
+    "subject_code": "5001",
+    "subject_detail": "创作者激励与打赏",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "视频号直播打赏收入",
+    "subject_code": "5001",
+    "subject_detail": "创作者激励与打赏",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "平台创作激励收入",
+    "subject_code": "5001",
+    "subject_detail": "创作者激励与打赏",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "平台技术服务费",
+    "subject_code": "5601",
+    "subject_detail": "平台技术服务费",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "抖店技术服务费",
+    "subject_code": "5601",
+    "subject_detail": "平台技术服务费",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "快手小店技术服务费",
+    "subject_code": "5601",
+    "subject_detail": "平台技术服务费",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "微信小店技术服务费",
+    "subject_code": "5601",
+    "subject_detail": "平台技术服务费",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "小红书平台技术服务费",
+    "subject_code": "5601",
+    "subject_detail": "平台技术服务费",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "淘宝平台技术服务费",
+    "subject_code": "5601",
+    "subject_detail": "平台技术服务费",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "平台交易服务费",
+    "subject_code": "5601",
+    "subject_detail": "平台技术服务费",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "平台推广投流费",
+    "subject_code": "5601",
+    "subject_detail": "平台推广投流",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "巨量千川投流费",
+    "subject_code": "5601",
+    "subject_detail": "平台推广投流",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "DOU+投放费",
+    "subject_code": "5601",
+    "subject_detail": "平台推广投流",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "磁力金牛投流费",
+    "subject_code": "5601",
+    "subject_detail": "平台推广投流",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "小红书聚光投放费",
+    "subject_code": "5601",
+    "subject_detail": "平台推广投流",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "小红书薯条投放费",
+    "subject_code": "5601",
+    "subject_detail": "平台推广投流",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "万相台推广费",
+    "subject_code": "5601",
+    "subject_detail": "平台推广投流",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "阿里妈妈推广费",
+    "subject_code": "5601",
+    "subject_detail": "平台推广投流",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "平台店铺保证金",
+    "subject_code": "1221",
+    "subject_detail": "平台保证金",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "抖店店铺保证金",
+    "subject_code": "1221",
+    "subject_detail": "平台保证金",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "快手小店店铺保证金",
+    "subject_code": "1221",
+    "subject_detail": "平台保证金",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "微信小店店铺保证金",
+    "subject_code": "1221",
+    "subject_detail": "平台保证金",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "小红书店铺保证金",
+    "subject_code": "1221",
+    "subject_detail": "平台保证金",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "淘宝店铺保证金",
+    "subject_code": "1221",
+    "subject_detail": "平台保证金",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "直播平台履约保证金",
+    "subject_code": "1221",
+    "subject_detail": "平台保证金",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "平台销售退回",
+    "subject_code": "5001",
+    "subject_detail": "平台销售退回",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "抖店订单退货退款",
+    "subject_code": "5001",
+    "subject_detail": "平台销售退回",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "快手小店订单退货退款",
+    "subject_code": "5001",
+    "subject_detail": "平台销售退回",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "微信小店订单退货退款",
+    "subject_code": "5001",
+    "subject_detail": "平台销售退回",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "小红书订单退货退款",
+    "subject_code": "5001",
+    "subject_detail": "平台销售退回",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "淘宝直播订单退货退款",
+    "subject_code": "5001",
+    "subject_detail": "平台销售退回",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "平台退款冲减销售收入",
+    "subject_code": "5001",
+    "subject_detail": "平台销售退回",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "内容合作方分成成本",
+    "subject_code": "5401",
+    "subject_detail": "内容合作分成",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "支付MCN机构分成",
+    "subject_code": "5401",
+    "subject_detail": "内容合作分成",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "支付签约主播分成",
+    "subject_code": "5401",
+    "subject_detail": "内容合作分成",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "支付合作达人分成",
+    "subject_code": "5401",
+    "subject_detail": "内容合作分成",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "支付内容合作方分成",
+    "subject_code": "5401",
+    "subject_detail": "内容合作分成",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "结算直播团队分成",
+    "subject_code": "5401",
+    "subject_detail": "内容合作分成",
+    "scenario": "内容平台资金往来"
+  },
+  {
+    "text": "结算联合创作者分成",
+    "subject_code": "5401",
+    "subject_detail": "内容合作分成",
+    "scenario": "内容平台资金往来"
+  }
+]
