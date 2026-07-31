@@ -100,6 +100,41 @@ class BatchReviewTests(unittest.TestCase):
         self.assertTrue(all(item["matched_subject"] for item in items))
         self.assertTrue(all(item["match_type"] == "review_fallback" for item in items))
 
+    def test_large_batch_uses_semantic_bridge_without_model_call(self):
+        class BridgeMatcher:
+            @staticmethod
+            def match_rules(_text):
+                return []
+
+            @staticmethod
+            def match_semantic_bridge(_text):
+                return [{
+                    "record": {
+                        "subject": "1405 库存商品",
+                        "law": "小企业会计准则",
+                    },
+                    "match_type": "semantic_bridge",
+                    "matched_word": "茶叶",
+                    "score": 30,
+                }]
+
+            @staticmethod
+            def match_with_ai(_text):
+                raise AssertionError("large batch must defer model matching")
+
+        module = object.__new__(BatchImportModule)
+        module.semantic_matcher = BridgeMatcher()
+        module._subject_match_cache = {}
+        module.subject_options = ["1405 库存商品"]
+        item = sample_item(description="茶叶礼盒采购", tax_categories=["茶"])
+
+        module._apply_automatic_match(item, allow_ai=False)
+
+        self.assertEqual(item["matched_subject"], "1405 库存商品")
+        self.assertEqual(item["match_type"], "semantic_bridge")
+        self.assertTrue(item["ai_deferred"])
+        self.assertTrue(item["needs_review"])
+
     def test_bulk_updates_change_only_checked_fields(self):
         item = sample_item()
         unchanged = {

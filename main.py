@@ -10,6 +10,7 @@ import os
 import sys
 import json
 import atexit
+import faulthandler
 import threading
 import traceback
 from pathlib import Path
@@ -63,6 +64,41 @@ FONT = ("微软雅黑", 10)
 FONT_B = ("微软雅黑", 10, "bold")
 FONT_T = ("微软雅黑", 14, "bold")
 FONT_S = ("微软雅黑", 9)
+
+
+def _install_runtime_diagnostics(data_dir: Path) -> None:
+    """Keep a native-failure trace even when the GUI has no console window."""
+    try:
+        data_dir.mkdir(parents=True, exist_ok=True)
+        fatal_path = data_dir / "fatal-crash.log"
+        fatal_handle = open(fatal_path, "ab", buffering=0)
+        faulthandler.enable(file=fatal_handle, all_threads=True)
+
+        def close_fatal_handle() -> None:
+            try:
+                faulthandler.disable()
+                fatal_handle.close()
+            except (OSError, ValueError):
+                pass
+
+        atexit.register(close_fatal_handle)
+    except (OSError, RuntimeError):
+        fatal_handle = None
+
+    previous_hook = threading.excepthook
+
+    def record_thread_failure(args) -> None:
+        try:
+            detail = "".join(traceback.format_exception(
+                args.exc_type, args.exc_value, args.exc_traceback
+            ))
+            with (data_dir / "thread-crash.log").open("a", encoding="utf-8") as handle:
+                handle.write(f"\n[{datetime.now().isoformat(timespec='seconds')}]\n{detail}")
+        except OSError:
+            pass
+        previous_hook(args)
+
+    threading.excepthook = record_thread_failure
 
 
 class AppConfig:
@@ -788,6 +824,7 @@ def main():
     """主函数"""
     config_path = PROJECT_ROOT / "config.json"
     bootstrap_config = AppConfig(config_path)
+    _install_runtime_diagnostics(bootstrap_config.data_dir)
     credential_store = CredentialStore(bootstrap_config.auth_path)
     session = show_startup_auth(
         bootstrap_config.app_name,

@@ -31,6 +31,11 @@ YELLOW = "#FFF4CE"
 GRAY = "#D0D0D0"
 ORANGE = "#E67E22"
 
+# CPU-only machines can spend more than a minute evaluating the full semantic
+# prompt for one request. Large imports therefore use deterministic rules and
+# the semantic bridge first; users can still run the model on selected rows.
+BATCH_AI_MAX_ROWS = 200
+
 FONT = ("微软雅黑", 10)
 FONT_B = ("微软雅黑", 10, "bold")
 FONT_T = ("微软雅黑", 14, "bold")
@@ -724,6 +729,7 @@ class BatchImportModule(tk.Frame):
         files = list(self.selected_files)
         self._recognition_failures = []
         self._recognition_duplicates = []
+        self._batch_ai_deferred_files = []
         known_invoice_keys = set()
         if self.store:
             known_invoice_keys = {
@@ -780,6 +786,9 @@ class BatchImportModule(tk.Frame):
                         items = [self.ocr_service.recognize_invoice(source)]
 
                     item_total = len(items)
+                    allow_batch_ai = item_total <= BATCH_AI_MAX_ROWS
+                    if not allow_batch_ai:
+                        self._batch_ai_deferred_files.append((source.name, item_total))
                     for item_index, item in enumerate(items, start=1):
                         if self._cancel_event.is_set():
                             break
@@ -802,7 +811,7 @@ class BatchImportModule(tk.Frame):
                                 f"发票号码 {invoice_key[1]} 已在当前账套或本批次中出现，已阻止重复入账"
                             )
                         elif not item.get("non_postable"):
-                            self._apply_automatic_match(item)
+                            self._apply_automatic_match(item, allow_ai=allow_batch_ai)
                         if item_total > 1 and (item_index == 1 or item_index % 10 == 0):
                             self._recognition_events.put(
                                 ("source_progress", item_index, item_total, source.name)
@@ -969,13 +978,20 @@ class BatchImportModule(tk.Frame):
             )
         if self.pending_items:
             self._load_item(min(self.current_index, len(self.pending_items) - 1))
-            self.next_step_var.set(
-                "下一步：检查推荐结果；科目不准可双击该行修改，确认后点击“3 全部确认入账”"
-            )
+            if self._batch_ai_deferred_files:
+                deferred_count = sum(count for _name, count in self._batch_ai_deferred_files)
+                self.next_step_var.set(
+                    f"下一步：已完成规则映射（{deferred_count} 条大批量记录未自动调用模型）；"
+                    "选中待复核记录后点击“重新匹配”进行语义分析，确认后再入账"
+                )
+            else:
+                self.next_step_var.set(
+                    "下一步：检查推荐结果；科目不准可双击该行修改，确认后点击“3 全部确认入账”"
+                )
         elif not cancelled:
             self.next_step_var.set("本批次没有可入账票据，请检查失败、作废或重复状态")
 
-    def _apply_automatic_match(self, item: Dict):
+    def _apply_automatic_match(self, item: Dict, allow_ai: bool = True):
         """Apply exact rules, then local-model semantics, then a review fallback."""
         if item.get("source_type") == "platform_excel":
             self._apply_platform_order_recommendation(item)
@@ -984,7 +1000,34 @@ class BatchImportModule(tk.Frame):
         matches = []
         if self.semantic_matcher and description:
             matches = self.semantic_matcher.match_rules(description)
-        if not matches and self.semantic_matcher and description:
+        if not matches and not allow_ai and self.semantic_matcher and description:
+            # The semantic bridge is vocabulary-backed and does not require a
+            # model request, making it suitable for thousands of CPU-bound rows.
+            bridge_matches = self.semantic_matcher.match_semantic_bridge(description)
+            if bridge_matches:
+                best = bridge_matches[0]
+                record = best.get("record", {})
+                item["matched_subject"] = record.get("subject", "")
+                item["match_score"] = float(best.get("score", 0))
+                item["match_type"] = best.get("match_type", "semantic_bridge")
+                item["law"] = record.get("law", "")
+                item["rule_category"] = best.get("rule_category", record.get("rule_category", ""))
+                item["rule_basis"] = best.get("rule_basis", record.get("rule_basis", "词库语义桥接"))
+                item["recommendation_reason"] = "批量导入使用词库语义桥接，待人工复核"
+                item["needs_review"] = True
+                item["manual_review_required"] = True
+                item["ai_deferred"] = True
+                item.setdefault("warnings", []).append(
+                    "大批量导入已跳过逐条模型请求；如需模型语义分析，请选中该行后点击“重新匹配”"
+                )
+                item["match_details"] = MR.format_match_details(best)
+                return
+            item["ai_deferred"] = True
+            item.setdefault("warnings", []).append(
+                "大批量导入已跳过逐条模型请求，当前为待复核占位推荐；可选中该行后点击“重新匹配”"
+            )
+
+        if not matches and allow_ai and self.semantic_matcher and description:
             tax_categories = tuple(item.get("tax_categories") or [])
             industry = str(item.get("company_industry", "")).strip()
             invoice_type = str(item.get("invoice_type", "进项"))

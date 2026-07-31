@@ -1,7 +1,7 @@
 {
   "app": {
     "name": "小企业会计智能记账报税工具",
-    "version": "1.7.5",
+    "version": "1.7.6",
     "locale": "zh-CN",
     "organization": "",
     "organizationType": "小企业"
