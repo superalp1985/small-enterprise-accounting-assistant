@@ -10,7 +10,9 @@ batch_import_module.py - 批量导入模块
 """
 
 import json
+import queue
 import threading
+import traceback
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 from pathlib import Path
@@ -184,6 +186,9 @@ class BatchImportModule(tk.Frame):
         self._match_in_progress = False
         self._match_loading = None
         self._recognition_thread = None
+        self._recognition_events = queue.Queue()
+        self._recognition_pump_id = None
+        self._recognition_ui_active = False
         self._recognition_failures: List[str] = []
         self._recognition_duplicates: List[str] = []
         self._subject_match_cache: Dict[tuple, Optional[Dict[str, Any]]] = {}
@@ -799,38 +804,28 @@ class BatchImportModule(tk.Frame):
                         elif not item.get("non_postable"):
                             self._apply_automatic_match(item)
                         if item_total > 1 and (item_index == 1 or item_index % 10 == 0):
-                            try:
-                                self.after(
-                                    0,
-                                    lambda current=item_index, count=item_total, name=source.name:
-                                    self._show_source_progress(current, count, name),
-                                )
-                            except tk.TclError:
-                                return
+                            self._recognition_events.put(
+                                ("source_progress", item_index, item_total, source.name)
+                            )
                     error = None
                 except Exception as exc:
                     items = []
                     error = exc
                     failed += 1
                 processed += 1
-                try:
-                    self.after(
-                        0, lambda i=index, t=total, fp=filepath, batch=items, err=error:
-                        self._accept_recognition_results(i, t, fp, batch, err)
-                    )
-                except tk.TclError:
-                    return
-            cancelled = self._cancel_event.is_set()
-            try:
-                self.after(
-                    0, lambda: self._finish_recognition(processed, failed, len(files), cancelled)
+                self._recognition_events.put(
+                    ("file_result", index, total, filepath, items, error)
                 )
-            except tk.TclError:
-                pass
+            cancelled = self._cancel_event.is_set()
+            self._recognition_events.put(
+                ("finished", processed, failed, len(files), cancelled)
+            )
 
         self._recognition_thread = threading.Thread(
             target=worker, name="batch-ocr-recognition", daemon=True
         )
+        self._recognition_ui_active = True
+        self._start_recognition_ui_pump()
         self._recognition_thread.start()
 
     def _show_source_progress(self, current: int, total: int, file_name: str):
@@ -840,12 +835,59 @@ class BatchImportModule(tk.Frame):
         )
 
     def _queue_import_progress(self, current: int, total: int, stage: str, file_name: str):
-        """Bridge parser callbacks from the worker thread to Tk's main loop."""
+        """Queue parser progress; only the Tk thread may touch widgets."""
+        self._recognition_events.put(
+            ("import_progress", current, total, stage, file_name)
+        )
+
+    def _start_recognition_ui_pump(self):
+        if self._recognition_pump_id is not None:
+            return
         try:
-            self.after(
-                0,
-                lambda c=current, t=total, s=stage, n=file_name:
-                self._show_import_progress(c, t, s, n),
+            self._recognition_pump_id = self.after(50, self._drain_recognition_events)
+        except tk.TclError:
+            self._recognition_ui_active = False
+
+    def _drain_recognition_events(self):
+        """Apply worker results on the Tk thread and bound work per UI tick."""
+        self._recognition_pump_id = None
+        handled = 0
+        while handled < 100:
+            try:
+                event = self._recognition_events.get_nowait()
+            except queue.Empty:
+                break
+            handled += 1
+            kind = event[0]
+            try:
+                if kind == "import_progress":
+                    self._show_import_progress(*event[1:])
+                elif kind == "source_progress":
+                    self._show_source_progress(*event[1:])
+                elif kind == "file_result":
+                    self._accept_recognition_results(*event[1:])
+                elif kind == "finished":
+                    self._finish_recognition(*event[1:])
+            except Exception as exc:
+                self._record_batch_thread_error(exc)
+
+        if self._recognition_ui_active or not self._recognition_events.empty():
+            self._start_recognition_ui_pump()
+
+    def _record_batch_thread_error(self, exc: Exception):
+        detail = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+        crash_log = Path(getattr(self.config, "data_dir", Path.cwd())) / "crash.log"
+        try:
+            crash_log.parent.mkdir(parents=True, exist_ok=True)
+            with crash_log.open("a", encoding="utf-8") as handle:
+                handle.write(f"\n[批量导入界面线程异常]\n{detail}")
+        except OSError:
+            pass
+        try:
+            messagebox.showerror(
+                "批量导入没有完成",
+                f"批量导入结果显示失败，原始文件没有自动入账。\n\n原因：{exc}\n\n诊断信息：{crash_log}",
+                parent=self,
             )
         except tk.TclError:
             pass
@@ -890,6 +932,7 @@ class BatchImportModule(tk.Frame):
         self._update_stats()
 
     def _finish_recognition(self, processed, failed, total, cancelled):
+        self._recognition_ui_active = False
         self.start_btn.configure(state="normal")
         self._pause_event.clear()
         self.pause_btn.configure(text="暂停")
@@ -1112,7 +1155,7 @@ class BatchImportModule(tk.Frame):
                 str(item.get("file_name", ""))[:15],
                 str(item.get("description", ""))[:20],
                 f"¥{float(item.get('amount', 0) or 0):.2f}",
-                item.get("matched_subject", "")[:15]
+                str(item.get("matched_subject") or "")[:15]
             ))
             if id(item) in selected_ids:
                 restored_selection.append(iid)
@@ -1951,7 +1994,8 @@ class BatchImportModule(tk.Frame):
         self._refresh_tree()
         self._update_stats()
         self.status_var.set(
-            f"修改已保存：{item['description'][:20]}" if changed else "复核草稿已保存，字段未变化"
+            f"修改已保存：{str(item.get('description') or '')[:20]}"
+            if changed else "复核草稿已保存，字段未变化"
         )
         self.next_step_var.set("修改已保存；继续复核其他票据，完成后点击“3 全部确认入账”")
 
