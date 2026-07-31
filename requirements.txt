@@ -8,6 +8,7 @@ requests>=2.31.0
 
 # Excel导出
 openpyxl>=3.0.0
+xlrd>=2.0.1
 
 # OCR 使用 runtime/ocr/python_deps 内的 Python 3.12 离线运行时依赖。
 # 图片与扫描 PDF 由 RapidOCR + ONNX Runtime + PDFium 处理。

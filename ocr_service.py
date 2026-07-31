@@ -171,6 +171,11 @@ class OcrService:
 
     @classmethod
     def _extract_invoice_fields(cls, lines: Iterable[str], raw_text: str) -> Dict[str, Any]:
+        normalized_lines = [
+            str(line).replace("\u3000", " ").strip()
+            for line in lines
+            if str(line).strip()
+        ]
         fields: Dict[str, Any] = {}
         patterns = {
             "invoice_code": r"发票代码\s*[：:]\s*([0-9A-Za-z]{8,20})",
@@ -187,11 +192,123 @@ class OcrService:
             if match:
                 fields[key] = match.group(1).strip()
 
+        if not fields.get("invoice_no"):
+            match = re.search(r"(?<!\d)(\d{20})(?!\d)", raw_text)
+            if match:
+                fields["invoice_no"] = match.group(1)
+        if not fields.get("invoice_date"):
+            match = re.search(r"(20\d{2}[年./-]\d{1,2}[月./-]\d{1,2}日?)", raw_text)
+            if match:
+                fields["invoice_date"] = match.group(1)
+
+        party_fields = cls._extract_party_fields(normalized_lines)
+        for key, value in party_fields.items():
+            fields.setdefault(key, value)
+        if not fields.get("item_name"):
+            fields["item_name"] = cls._extract_item_name(normalized_lines)
+
         fields["invoice_date"] = cls._normalize_date(fields.get("invoice_date", ""))
         fields["amount"] = cls._extract_amount(raw_text, ("不含税金额", "金额"))
         fields["tax_amount"] = cls._extract_amount(raw_text, ("税额",))
         fields["total_amount"] = cls._extract_amount(raw_text, ("价税合计", "小写合计", "合计"))
+        reconciled = cls._extract_reconciled_currency_amounts(raw_text)
+        if reconciled:
+            fields["amount"] = fields.get("amount") or reconciled[0]
+            fields["tax_amount"] = fields.get("tax_amount") or reconciled[1]
+            fields["total_amount"] = fields.get("total_amount") or reconciled[2]
         return fields
+
+    @classmethod
+    def _extract_party_fields(cls, lines: list[str]) -> Dict[str, str]:
+        fields: Dict[str, str] = {}
+        compact_lines = [re.sub(r"\s+", "", line) for line in lines]
+
+        for index, compact in enumerate(compact_lines):
+            for marker, key in (("购买方信息", "buyer"), ("销售方信息", "seller")):
+                if marker not in compact or fields.get(key):
+                    continue
+                for candidate in lines[index + 1:index + 6]:
+                    match = re.search(r"名称\s*[：:]\s*(.+)", candidate)
+                    if match and match.group(1).strip() not in {"名称", "名称："}:
+                        fields[key] = match.group(1).strip()
+                        break
+
+        tax_ids: list[tuple[int, str]] = []
+        for index, line in enumerate(lines):
+            for match in re.finditer(
+                r"(?<![0-9A-Z])((?:[0-9A-Z]\s*){18})(?![0-9A-Z])",
+                line.upper(),
+            ):
+                value = re.sub(r"\s+", "", match.group(1))
+                if value not in {item[1] for item in tax_ids}:
+                    tax_ids.append((index, value))
+
+        if tax_ids:
+            fields.setdefault("buyer_tax_id", tax_ids[0][1])
+        if len(tax_ids) >= 2:
+            fields.setdefault("seller_tax_id", tax_ids[1][1])
+
+        for party_index, key in ((0, "buyer"), (1, "seller")):
+            if fields.get(key) or len(tax_ids) <= party_index:
+                continue
+            identifier_index = tax_ids[party_index][0]
+            for candidate in reversed(lines[max(0, identifier_index - 3):identifier_index]):
+                compact = re.sub(r"\s+", "", candidate)
+                if cls._is_party_name_candidate(compact):
+                    fields[key] = re.sub(r"^名称\s*[：:]\s*", "", candidate).strip()
+                    break
+        return fields
+
+    @staticmethod
+    def _is_party_name_candidate(value: str) -> bool:
+        ignored = (
+            "统一社会信用代码", "纳税人识别号", "购买方", "销售方", "发票",
+            "开票日期", "项目名称", "规格型号", "合计",
+        )
+        return (
+            len(value) >= 3
+            and not any(label in value for label in ignored)
+            and not re.fullmatch(r"[0-9A-Z]+", value, re.IGNORECASE)
+            and not re.search(r"[¥￥]", value)
+        )
+
+    @staticmethod
+    def _extract_item_name(lines: list[str]) -> str:
+        units = {"件", "个", "台", "套", "箱", "盒", "包", "瓶", "次", "项"}
+        for index, line in enumerate(lines):
+            compact = re.sub(r"\s+", "", line)
+            if not compact.startswith("*") or len(compact) < 4:
+                continue
+            parts = [compact]
+            for candidate in lines[index + 1:index + 5]:
+                candidate = re.sub(r"\s+", "", candidate)
+                if (
+                    not candidate
+                    or candidate.startswith("*")
+                    or candidate in units
+                    or re.search(r"[¥￥]|\d+(?:\.\d+)?%", candidate)
+                    or re.fullmatch(r"[-+]?\d[\d,.]*", candidate)
+                ):
+                    break
+                parts.append(candidate)
+            return "".join(parts)[:240]
+        return ""
+
+    @staticmethod
+    def _extract_reconciled_currency_amounts(text: str) -> Optional[tuple[float, float, float]]:
+        values = [
+            float(match.group(1).replace(",", ""))
+            for match in re.finditer(r"[¥￥]\s*([-+]?\d[\d,]*\.\d{2})", text)
+        ]
+        for first in range(len(values) - 2):
+            for second in range(first + 1, len(values) - 1):
+                for third in range(second + 1, len(values)):
+                    amount, tax_amount, total_amount = (
+                        values[first], values[second], values[third]
+                    )
+                    if abs(amount + tax_amount - total_amount) <= 0.011:
+                        return amount, tax_amount, total_amount
+        return None
 
     @staticmethod
     def _extract_amount(text: str, labels: Iterable[str]) -> Optional[float]:

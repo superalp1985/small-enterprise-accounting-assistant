@@ -1,7 +1,9 @@
 param(
     [switch]$SkipInstaller,
     [switch]$SkipPyInstaller,
-    [string]$EmbeddedPythonVersion = "3.12.10"
+    [string]$EmbeddedPythonVersion = "3.12.10",
+    [ValidateRange(1, 5)]
+    [int]$InstallerRetries = 3
 )
 
 $ErrorActionPreference = "Stop"
@@ -11,6 +13,7 @@ $DistDir = Join-Path $ProjectRoot "dist"
 $ReleaseDir = Join-Path $ProjectRoot "release"
 $BuildCacheDir = Join-Path $env:LOCALAPPDATA "SmallEnterpriseAccountingBuildCache"
 $EmbeddedPythonSha256 = "4acbed6dd1c744b0376e3b1cf57ce906f9dc9e95e68824584c8099a63025a3c3"
+$InstallerStageRoot = $null
 
 function Remove-ProjectDirectory([string]$Path) {
     $full = [IO.Path]::GetFullPath($Path)
@@ -127,26 +130,83 @@ try {
             throw "Inno Setup 6 was not found. Install JRSoftware.InnoSetup or rerun with -SkipInstaller."
         }
         $env:ACCOUNTINGDEMO_DIST_DIR = $AppDir
-        $env:ACCOUNTINGDEMO_RELEASE_DIR = $ReleaseDir
-        & $iscc (Join-Path $ProjectRoot "installer\small_enterprise.iss")
-        if ($LASTEXITCODE -ne 0) {
-            throw "Inno Setup failed with exit code $LASTEXITCODE"
+
+        $tempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
+        $InstallerStageRoot = Join-Path $tempRoot (
+            "SmallEnterpriseAccounting-Inno-{0}-{1}" -f $PID, [guid]::NewGuid().ToString("N")
+        )
+        $resolvedStage = [IO.Path]::GetFullPath($InstallerStageRoot)
+        $tempPrefix = $tempRoot.TrimEnd('\') + '\'
+        if (-not $resolvedStage.StartsWith($tempPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+            throw "Installer staging path escaped the system temporary directory: $resolvedStage"
         }
+        New-Item -ItemType Directory -Path $InstallerStageRoot -Force | Out-Null
+
+        $builtInstaller = $null
+        $installerExitCode = -1
+        for ($attempt = 1; $attempt -le $InstallerRetries; $attempt++) {
+            $attemptDir = Join-Path $InstallerStageRoot "attempt-$attempt"
+            New-Item -ItemType Directory -Path $attemptDir -Force | Out-Null
+            $env:ACCOUNTINGDEMO_RELEASE_DIR = $attemptDir
+            Write-Output "Building installer (attempt $attempt/$InstallerRetries) in $attemptDir"
+            & $iscc (Join-Path $ProjectRoot "installer\small_enterprise.iss")
+            $installerExitCode = $LASTEXITCODE
+            if ($installerExitCode -eq 0) {
+                $builtInstaller = Get-ChildItem -LiteralPath $attemptDir -Filter "*Setup-$AppVersion.exe" -File |
+                    Sort-Object LastWriteTime -Descending | Select-Object -First 1
+                if ($builtInstaller) {
+                    break
+                }
+                $installerExitCode = -2
+            }
+
+            if ($attempt -lt $InstallerRetries) {
+                Write-Warning "Inno Setup attempt $attempt failed with exit code $installerExitCode; retrying with a fresh output path."
+                Start-Sleep -Seconds (2 * $attempt)
+            }
+        }
+        if (-not $builtInstaller) {
+            throw "Inno Setup failed after $InstallerRetries attempts; last exit code $installerExitCode"
+        }
+
+        $targetInstaller = Join-Path $ReleaseDir $builtInstaller.Name
+        $partialInstaller = "$targetInstaller.partial"
+        Remove-Item -LiteralPath $partialInstaller -Force -ErrorAction SilentlyContinue
+        Copy-Item -LiteralPath $builtInstaller.FullName -Destination $partialInstaller -Force
+        $stream = [IO.File]::OpenRead($partialInstaller)
+        try {
+            if ($stream.ReadByte() -ne 0x4D -or $stream.ReadByte() -ne 0x5A) {
+                throw "Generated installer does not have a valid Windows PE header."
+            }
+        }
+        finally {
+            $stream.Dispose()
+        }
+        Move-Item -LiteralPath $partialInstaller -Destination $targetInstaller -Force
+        $Installer = Get-Item -LiteralPath $targetInstaller
     }
 
     Write-Output "APP_DIR=$AppDir"
     Write-Output "SMOKE_OUTPUT=$SmokeOutput"
     Write-Output "FULL_CYCLE_OUTPUT=$FullCycleOutput"
     if (-not $SkipInstaller) {
-        $Installer = Get-ChildItem -LiteralPath $ReleaseDir -Filter "*Setup-$AppVersion.exe" -File |
-            Sort-Object LastWriteTime -Descending | Select-Object -First 1
         Write-Output "INSTALLER=$($Installer.FullName)"
     }
 }
 finally {
     Pop-Location
+    if ($InstallerStageRoot -and (Test-Path -LiteralPath $InstallerStageRoot)) {
+        $tempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
+        $resolvedStage = [IO.Path]::GetFullPath($InstallerStageRoot)
+        $tempPrefix = $tempRoot.TrimEnd('\') + '\'
+        if ($resolvedStage.StartsWith($tempPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+            Remove-Item -LiteralPath $resolvedStage -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
     Remove-Item Env:ACCOUNTINGDEMO_DATA_ROOT -ErrorAction SilentlyContinue
     Remove-Item Env:ACCOUNTINGDEMO_SMOKE_OUTPUT -ErrorAction SilentlyContinue
     Remove-Item Env:ACCOUNTINGDEMO_FULL_CYCLE_ROOT -ErrorAction SilentlyContinue
     Remove-Item Env:ACCOUNTINGDEMO_FULL_CYCLE_OUTPUT -ErrorAction SilentlyContinue
+    Remove-Item Env:ACCOUNTINGDEMO_DIST_DIR -ErrorAction SilentlyContinue
+    Remove-Item Env:ACCOUNTINGDEMO_RELEASE_DIR -ErrorAction SilentlyContinue
 }

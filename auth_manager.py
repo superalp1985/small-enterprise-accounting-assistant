@@ -17,6 +17,8 @@ from pathlib import Path
 from tkinter import messagebox
 from typing import Optional
 
+from text_context_menu import install_text_context_menu
+
 
 SCHEMA_VERSION = 1
 PBKDF2_ITERATIONS = 600_000
@@ -237,6 +239,7 @@ def show_startup_auth(
 ) -> Optional[AuthSession]:
     """Show the mandatory first-run setup or login window."""
     root = tk.Tk()
+    install_text_context_menu(root)
     root.title(f"{app_name} - 账户登录")
     root.configure(bg=BG)
     root.resizable(False, False)

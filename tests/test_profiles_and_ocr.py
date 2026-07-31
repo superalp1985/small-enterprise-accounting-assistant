@@ -8,6 +8,7 @@ from pathlib import Path
 
 from main import AppConfig
 from model_runner import LlamaServerRunner, SemanticMatcher, format_match_details
+from modules.batch_import_module import _invoice_identity, _register_invoice_identity
 from modules.vocabulary_module import load_vocab, parse_terms, save_vocab, split_layer3
 from natural_entry import build_voucher_plan
 from ocr_service import OcrService
@@ -120,6 +121,76 @@ class AccountingProfileTests(unittest.TestCase):
         self.assertAlmostEqual(result["amount"], 13568.00)
         self.assertAlmostEqual(result["tax_amount"], 768.00)
         self.assertGreater(result["confidence"], 0.99)
+
+    def test_all_electronic_invoice_text_layer_with_detached_values(self):
+        lines = [
+            "电子发票（普通发票） 发票号码：", "开票日期：", "购买方信息",
+            "统一社会信用代码/纳税人识别号：", "销售信息", "销售方信息",
+            "统一社会信用代码/纳税人识别号：", "名称： 名称：", "项目名称",
+            "合 计", "价税合计（大写） （小写）", "开票人：",
+            "26442000008647804006", "2026年07月28日", "衡东县御福茶坊",
+            "92430424MA4PR52J6J", "广州市八马茶业有限公司",
+            "91440106567904422E", "¥ 129.41 ¥ 16.83",
+            "壹佰肆拾陆圆贰角肆分 ¥ 146.24", "杨燕华", "杨燕华",
+            "*茶*八马茶业特级金骏眉", "鸭屎香单丛冰岛普洱大红", "袍茶叶",
+            "13%件 175.22 22.78175.221", "*茶*八马茶业特级金骏眉",
+            "13%-45.81 -5.95",
+        ]
+
+        fields = OcrService._extract_invoice_fields(lines, "\n".join(lines))
+
+        self.assertEqual(fields["invoice_no"], "26442000008647804006")
+        self.assertEqual(fields["invoice_date"], "2026-07-28")
+        self.assertEqual(fields["buyer"], "衡东县御福茶坊")
+        self.assertEqual(fields["buyer_tax_id"], "92430424MA4PR52J6J")
+        self.assertEqual(fields["seller"], "广州市八马茶业有限公司")
+        self.assertEqual(fields["seller_tax_id"], "91440106567904422E")
+        self.assertEqual(
+            fields["item_name"],
+            "*茶*八马茶业特级金骏眉鸭屎香单丛冰岛普洱大红袍茶叶",
+        )
+        self.assertAlmostEqual(fields["amount"], 129.41)
+        self.assertAlmostEqual(fields["tax_amount"], 16.83)
+        self.assertAlmostEqual(fields["total_amount"], 146.24)
+
+    def test_all_electronic_invoice_ocr_lines_assign_parties_by_section(self):
+        lines = [
+            "发票号码：26352000001800611431", "开票日期：2026年07月28日",
+            "购买方信息", "名称：衡东县御福茶坊", "销售方信息",
+            "名称：福州鑫八马茶业有限公司",
+            "统一社会信用代码/纳税人识别号：92430424MA4PR52J6J",
+            "统一社会信用代码/纳税人识别号：91350102570993251U",
+            "项目名称", "*茶*2026年新茶上市龙井", "件", "1", "87.61",
+            "￥61.06", "￥7.94", "（小写）￥69.00",
+        ]
+
+        fields = OcrService._extract_invoice_fields(lines, "\n".join(lines))
+
+        self.assertEqual(fields["buyer"], "衡东县御福茶坊")
+        self.assertEqual(fields["seller"], "福州鑫八马茶业有限公司")
+        self.assertEqual(fields["buyer_tax_id"], "92430424MA4PR52J6J")
+        self.assertEqual(fields["seller_tax_id"], "91350102570993251U")
+        self.assertAlmostEqual(fields["total_amount"], 69.00)
+
+    def test_invoice_identity_blocks_same_all_electronic_invoice_number(self):
+        first = {
+            "invoice_code": "", "invoice_no": "26442000008647804006",
+        }
+        duplicate_copy = {
+            "invoice_code": " ", "invoice_no": "26442000008647804006",
+        }
+
+        self.assertEqual(_invoice_identity(first), _invoice_identity(duplicate_copy))
+        self.assertIsNone(_invoice_identity({"invoice_code": "", "invoice_no": ""}))
+        known = set()
+        self.assertEqual(
+            _register_invoice_identity(first, known),
+            (("", "26442000008647804006"), False),
+        )
+        self.assertEqual(
+            _register_invoice_identity(duplicate_copy, known),
+            (("", "26442000008647804006"), True),
+        )
 
     def test_vocab_edit_helpers_preserve_metadata_and_normalize_terms(self):
         self.assertEqual(

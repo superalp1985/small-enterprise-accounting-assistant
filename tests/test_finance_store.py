@@ -12,6 +12,7 @@ from openpyxl import load_workbook
 from finance_exporter import export_finance_workbook
 from finance_store import FinanceDataStore
 from legal_notice import LEGAL_NOTICE_SUMMARY, POLICY_PRESET_REVIEW_DATE, POLICY_SOURCES
+from management_dialogs import company_profile_errors, normalize_credit_code
 
 
 class FinanceStoreTests(unittest.TestCase):
@@ -45,6 +46,71 @@ class FinanceStoreTests(unittest.TestCase):
             "exports",
         )
 
+    def test_multiple_drafts_are_upserted_together(self):
+        saved = self.store.add_drafts([
+            {"type": "batch", "description": "票据一"},
+            {"type": "batch", "description": "票据二"},
+        ])
+        self.assertEqual(len(saved), 2)
+        self.assertNotEqual(saved[0]["id"], saved[1]["id"])
+
+        updated = self.store.add_drafts([
+            {**saved[0], "description": "票据一已修改"},
+            {"type": "manual", "description": "手工草稿"},
+        ])
+        self.assertEqual(len(updated), 2)
+        drafts = self.store.list_drafts()
+        self.assertEqual(len(drafts), 3)
+        by_id = {row["id"]: row for row in drafts}
+        self.assertEqual(by_id[saved[0]["id"]]["description"], "票据一已修改")
+
+        self.store.delete_drafts([saved[0]["id"], saved[1]["id"]])
+        remaining = self.store.list_drafts()
+        self.assertEqual(len(remaining), 1)
+        self.assertEqual(remaining[0]["type"], "manual")
+
+    def test_company_profile_validation_and_fixed_product_scope(self):
+        self.assertEqual(
+            company_profile_errors({"company": {"name": "", "credit_code": ""}}),
+            ["请填写企业名称", "请填写统一社会信用代码/税号"],
+        )
+        self.assertEqual(
+            normalize_credit_code(" 91110101ma00000001 "),
+            "91110101MA00000001",
+        )
+
+        settings = self.store.get_settings()
+        settings["company"].update({
+            "name": "  测试科技有限公司  ",
+            "credit_code": " 91110101ma00000001 ",
+            "taxpayer_type": "一般纳税人",
+            "currency": "美元",
+        })
+        settings["tax"].update({
+            "small_low_profit": False,
+            "invoice_required": False,
+            "input_vat_deductible": True,
+        })
+        settings["accounting"].update({
+            "standard": "企业会计准则",
+            "fiscal_year_start": "04-01",
+            "auto_backup": False,
+        })
+        self.store.save_settings(settings)
+
+        loaded = self.store.get_settings()
+        self.assertEqual(company_profile_errors(loaded), [])
+        self.assertEqual(loaded["company"]["name"], "测试科技有限公司")
+        self.assertEqual(loaded["company"]["credit_code"], "91110101MA00000001")
+        self.assertEqual(loaded["company"]["taxpayer_type"], "小规模纳税人")
+        self.assertEqual(loaded["company"]["currency"], "人民币")
+        self.assertTrue(loaded["tax"]["small_low_profit"])
+        self.assertTrue(loaded["tax"]["invoice_required"])
+        self.assertFalse(loaded["tax"]["input_vat_deductible"])
+        self.assertEqual(loaded["accounting"]["standard"], "小企业会计准则")
+        self.assertEqual(loaded["accounting"]["fiscal_year_start"], "01-01")
+        self.assertTrue(loaded["accounting"]["auto_backup"])
+
     def _seed_balanced_ledger(self):
         self.store.add_voucher_lines([
             {"科目": "1002 银行存款", "借方": 100, "摘要": "服务收款", "source": "manual"},
@@ -71,6 +137,50 @@ class FinanceStoreTests(unittest.TestCase):
                 {"科目": "5602 管理费用", "借方": 10},
                 {"科目": "1002 银行存款", "贷方": 9},
             ], voucher_date="2026-07-03")
+
+    def test_batch_invoice_and_voucher_posting_is_atomic(self):
+        entries = [
+            {
+                "voucher_date": "2026-07-05",
+                "lines": [
+                    {"科目": "5602 管理费用", "借方": 58.2, "摘要": "茶叶"},
+                    {"科目": "1002 银行存款", "贷方": 58.2, "摘要": "茶叶"},
+                ],
+                "invoice": {
+                    "invoice_no": "26952000003230149426",
+                    "invoice_date": "2026-07-05",
+                    "amount": 51.5, "tax_amount": 6.7, "total_amount": 58.2,
+                },
+            },
+            {
+                "voucher_date": "2026-07-05",
+                "lines": [
+                    {"科目": "5602 管理费用", "借方": 101, "摘要": "服务费"},
+                    {"科目": "1002 银行存款", "贷方": 101, "摘要": "服务费"},
+                ],
+                "invoice": {
+                    "invoice_code": "011001", "invoice_no": "00012345",
+                    "invoice_date": "2026-07-05",
+                    "amount": 100, "tax_amount": 1, "total_amount": 101,
+                },
+            },
+        ]
+        posted = self.store.post_invoice_vouchers(entries)
+        self.assertEqual(len(posted), 2)
+        self.assertEqual(len(self.store.list_vouchers()), 4)
+        self.assertEqual(len(self.store.list_invoices()), 2)
+        self.assertNotEqual(posted[0]["voucher_no"], posted[1]["voucher_no"])
+
+        ledger_before = self.store.list_vouchers(include_unposted=True)
+        invoices_before = self.store.list_invoices()
+        invalid = [entries[0], {**entries[1], "lines": [
+            {"科目": "5602 管理费用", "借方": 10},
+            {"科目": "1002 银行存款", "贷方": 9},
+        ]}]
+        with self.assertRaises(ValueError):
+            self.store.post_invoice_vouchers(invalid)
+        self.assertEqual(self.store.list_vouchers(include_unposted=True), ledger_before)
+        self.assertEqual(self.store.list_invoices(), invoices_before)
 
     def test_profile_isolation_and_duplicate_invoice_validation(self):
         other = FinanceDataStore(self.root / "governmental", "governmental", "行政事业单位会计")

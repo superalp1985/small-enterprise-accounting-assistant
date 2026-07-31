@@ -9,6 +9,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 from pathlib import Path
 from typing import List, Dict, Optional
+from datetime import datetime
 import json
 
 BG = "#F0F0F0"
@@ -36,20 +37,29 @@ def make_btn(parent, text, cmd, color=BLUE, width=12):
 class InvoicePreviewDialog:
     """票据预览确认对话框"""
 
-    def __init__(self, parent, invoice_data: Dict, vocab: List[Dict]):
+    def __init__(
+        self,
+        parent,
+        invoice_data: Dict,
+        vocab: List[Dict],
+        confirm_label: str = "确认入账",
+        title: str = "票据信息确认",
+    ):
         self.parent = parent
         self.invoice_data = invoice_data
         self.vocab = vocab
         self.confirmed_data = {}
         self.editing = False
         self.field_entries = {}
+        self.confirm_label = confirm_label
+        self.title = title
 
         self._build_ui()
 
     def _build_ui(self):
         """构建UI"""
         self.dlg = tk.Toplevel(self.parent)
-        self.dlg.title("票据信息确认")
+        self.dlg.title(self.title)
         self.dlg.configure(bg=BG)
         self.dlg.grab_set()
         self.dlg.geometry("980x650")
@@ -73,18 +83,24 @@ class InvoicePreviewDialog:
         # 识别字段
         self.fields = {
             "file_name": tk.StringVar(value=self.invoice_data.get("file_name", "")),
+            "invoice_code": tk.StringVar(value=self.invoice_data.get("invoice_code", "")),
             "invoice_no": tk.StringVar(value=self.invoice_data.get("invoice_no", "")),
             "invoice_date": tk.StringVar(value=self.invoice_data.get("invoice_date", "")),
-            "amount": tk.StringVar(value=str(self.invoice_data.get("amount", 0))),
+            "amount": tk.StringVar(value=str(
+                self.invoice_data.get("total_amount", self.invoice_data.get("amount", 0))
+            )),
+            "tax_amount": tk.StringVar(value=str(self.invoice_data.get("tax_amount", 0))),
             "seller": tk.StringVar(value=self.invoice_data.get("seller", "")),
             "buyer": tk.StringVar(value=self.invoice_data.get("buyer", ""))
         }
 
         field_labels = {
             "file_name": "文件名",
+            "invoice_code": "发票代码",
             "invoice_no": "发票号码",
             "invoice_date": "开票日期",
-            "amount": "金额（元）",
+            "amount": "价税合计（元）",
+            "tax_amount": "税额（元）",
             "seller": "销售方",
             "buyer": "购买方"
         }
@@ -170,7 +186,7 @@ class InvoicePreviewDialog:
         make_btn(btn_row, "查看依据", self._view_law, BLUE, 12).pack(side="left", padx=4)
         self.edit_button = make_btn(btn_row, "修改信息", self._edit_fields, ORANGE, 12)
         self.edit_button.pack(side="left", padx=4)
-        make_btn(btn_row, "✓ 确认入账", self._confirm, GREEN, 12).pack(side="right", padx=4)
+        make_btn(btn_row, self.confirm_label, self._confirm, GREEN, 12).pack(side="right", padx=4)
         make_btn(btn_row, "✗ 取消", self.dlg.destroy, RED, 10).pack(side="right", padx=4)
 
         self.parent.update_idletasks()
@@ -251,6 +267,8 @@ class InvoicePreviewDialog:
         subject = self.match_result_var.get().strip()
         desc = self.desc_var.get().strip()
         amount_str = self.fields["amount"].get().strip()
+        tax_amount_str = self.fields["tax_amount"].get().strip() or "0"
+        invoice_date = self.fields["invoice_date"].get().strip()
 
         if not subject:
             messagebox.showwarning("提示", "必须选择科目")
@@ -272,13 +290,30 @@ class InvoicePreviewDialog:
         if amount <= 0:
             messagebox.showerror("错误", "金额必须大于0")
             return
+        try:
+            tax_amount = float(tax_amount_str)
+        except ValueError:
+            messagebox.showerror("错误", "税额格式不正确")
+            return
+        if tax_amount < 0 or tax_amount > amount:
+            messagebox.showerror("错误", "税额应大于等于0，且不能超过价税合计")
+            return
+        try:
+            datetime.strptime(invoice_date, "%Y-%m-%d")
+        except ValueError:
+            messagebox.showerror("错误", "开票日期请填写为 YYYY-MM-DD，例如 2026-07-29")
+            return
 
         # 收集确认数据
         self.confirmed_data = {
             "file_name": self.fields["file_name"].get(),
+            "invoice_code": self.fields["invoice_code"].get().strip(),
             "invoice_no": self.fields["invoice_no"].get(),
-            "invoice_date": self.fields["invoice_date"].get(),
+            "invoice_date": invoice_date,
             "amount": amount,
+            "total_amount": amount,
+            "tax_amount": tax_amount,
+            "net_amount": round(amount - tax_amount, 2),
             "seller": self.fields["seller"].get(),
             "buyer": self.fields["buyer"].get(),
             "subject": subject,
@@ -293,7 +328,19 @@ class InvoicePreviewDialog:
         self.dlg.wait_window()
         return self.confirmed_data if self.confirmed_data else None
 
-def show_invoice_preview(parent, invoice_data: Dict, vocab: List[Dict]) -> Optional[Dict]:
+def show_invoice_preview(
+    parent,
+    invoice_data: Dict,
+    vocab: List[Dict],
+    confirm_label: str = "确认入账",
+    title: str = "票据信息确认",
+) -> Optional[Dict]:
     """显示票据预览确认对话框"""
-    dialog = InvoicePreviewDialog(parent, invoice_data, vocab)
+    dialog = InvoicePreviewDialog(
+        parent,
+        invoice_data,
+        vocab,
+        confirm_label=confirm_label,
+        title=title,
+    )
     return dialog.show()

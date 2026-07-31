@@ -34,12 +34,18 @@ from modules import solo_workbench_module
 from modules.loading_dialog import ApproxProgressDialog
 from finance_store import FinanceDataStore
 from legal_notice import LEGAL_NOTICE_SUMMARY
-from management_dialogs import show_archive_manager, show_legal_notice, show_settings
+from management_dialogs import (
+    company_profile_errors,
+    show_archive_manager,
+    show_legal_notice,
+    show_settings,
+)
 from auth_manager import (
     CredentialStore,
     show_change_password_dialog,
     show_startup_auth,
 )
+from text_context_menu import install_text_context_menu
 
 
 # ── 颜色和字体常量 ──
@@ -202,6 +208,7 @@ class MainWindow(tk.Tk):
     def __init__(self, config: AppConfig, operator: str,
                  credential_store: CredentialStore):
         super().__init__()
+        install_text_context_menu(self)
         self.config = config
         self.authenticated_operator = operator
         self.credential_store = credential_store
@@ -216,6 +223,7 @@ class MainWindow(tk.Tk):
             config.profile_label,
             config.primary_accounting_standard,
         )
+        self._refresh_company_identity(self.finance_store.get_settings())
         self._startup_safety_error = None
         try:
             self._startup_safety = self.finance_store.startup_safety_check(keep=5)
@@ -244,13 +252,46 @@ class MainWindow(tk.Tk):
         # 构建UI
         self._build_ui()
 
-        self.after(250, self._show_startup_safety_result)
-
-        # UI先显示，再在后台预载模型。加载后服务进程一直常驻到程序退出。
-        self.after(100, self._preload_model_async)
+        self._startup_tasks_started = False
+        self.after(80, self._begin_startup_flow)
 
         # 注册atexit退出钩子
         atexit.register(self._cleanup_resources)
+
+    def _begin_startup_flow(self):
+        settings = self.finance_store.get_settings()
+        if company_profile_errors(settings):
+            show_settings(
+                self,
+                self.finance_store,
+                self._on_first_company_profile_saved,
+                first_run=True,
+                on_cancel=self._cancel_first_company_profile,
+            )
+            return
+        self._continue_startup_flow()
+
+    def _continue_startup_flow(self):
+        if self._startup_tasks_started or self._is_shutting_down:
+            return
+        self._startup_tasks_started = True
+        self.after(50, self._show_startup_safety_result)
+        # The model is loaded only after mandatory company information is saved.
+        self.after(100, self._preload_model_async)
+
+    def _on_first_company_profile_saved(self, settings):
+        self._on_settings_saved(settings)
+        L.log("企业资料设置", "首次企业名称和统一社会信用代码已保存")
+        self._continue_startup_flow()
+
+    def _cancel_first_company_profile(self):
+        messagebox.showinfo(
+            "需要企业资料",
+            "首次进入必须先确认企业名称和统一社会信用代码，本次不会进入账套。",
+            parent=self,
+        )
+        self._cleanup_resources()
+        self.destroy()
 
     def report_callback_exception(self, exc_type, exc_value, exc_traceback):
         """Turn otherwise silent Tk callback crashes into actionable Chinese guidance."""
@@ -399,9 +440,11 @@ class MainWindow(tk.Tk):
         organization = (
             f" · {self.config.organization}" if self.config.organization else ""
         )
-        tk.Label(title_bar,
-                 text=f"{self.config.profile_label}{organization}",
-                 font=FONT_S, bg=DARK, fg="#AACCFF").pack(side="right", padx=18)
+        self.organization_label = tk.Label(
+            title_bar, text=f"{self.config.profile_label}{organization}",
+            font=FONT_S, bg=DARK, fg="#AACCFF",
+        )
+        self.organization_label.pack(side="right", padx=18)
 
         # 模式切换栏
         mode_bar = tk.Frame(self, bg=GRAY, height=45)
@@ -419,7 +462,7 @@ class MainWindow(tk.Tk):
                                    bg=GRAY, fg="#444", relief="flat", pady=10,
                                    cursor="hand2",
                                    command=lambda: self._switch_module("manual"))
-        self.b_audit = tk.Button(mode_bar, text="  审核管理  ", font=FONT_B,
+        self.b_audit = tk.Button(mode_bar, text="  操作日志  ", font=FONT_B,
                                    bg=GRAY, fg="#444", relief="flat", pady=10,
                                    cursor="hand2",
                                    command=lambda: self._switch_module("audit"))
@@ -560,9 +603,11 @@ class MainWindow(tk.Tk):
             self.manual_module.pack(fill="both", expand=True)
             self._status_update("手工入账模式 | 智能科目匹配")
         elif module_name == "audit":
+            if hasattr(self.audit_module, "_refresh"):
+                self.audit_module._refresh(show_message=False)
             self.audit_module.pack(fill="both", expand=True)
             self._status_update(
-                f"审核管理模式 | 当前账户：{self.authenticated_operator}"
+                f"只读操作日志 | 当前账户：{self.authenticated_operator}"
             )
         elif module_name == "vocab":
             self.vocab_module.pack(fill="both", expand=True)
@@ -597,14 +642,27 @@ class MainWindow(tk.Tk):
         show_archive_manager(self, self.finance_store, self._reload_persisted_views)
 
     def _on_settings_saved(self, settings):
-        company_name = settings.get("company", {}).get("name", "").strip()
-        self.config.organization = company_name
-        self.title(
-            f"{self.config.app_name} · {self.config.profile_label} v{self.config.app_version}"
-        )
+        self._refresh_company_identity(settings)
         self.tax_module.refresh()
         self.home_module.refresh()
-        self._status_update("系统设置已保存")
+        L.log("系统设置", "企业资料及账套设置已保存")
+        self._status_update("系统设置已保存并同步到当前账套")
+
+    def _refresh_company_identity(self, settings=None):
+        settings = settings or self.finance_store.get_settings()
+        company_name = str(
+            settings.get("company", {}).get("name", "")
+        ).strip()
+        self.config.organization = company_name
+        identity = company_name or self.config.profile_label
+        self.title(
+            f"{self.config.app_name} · {identity} v{self.config.app_version}"
+        )
+        if hasattr(self, "organization_label"):
+            suffix = f" · {company_name}" if company_name else ""
+            self.organization_label.configure(
+                text=f"{self.config.profile_label}{suffix}"
+            )
 
     def _on_basic_data_changed(self):
         if hasattr(self.manual_module, "reload_from_store"):
@@ -625,12 +683,8 @@ class MainWindow(tk.Tk):
         self._status_update("账套数据已恢复并重新载入")
 
     def _open_log_view(self):
-        """打开操作日志查看"""
-        log_path = self.config.audit_log_path
-        if log_path.exists():
-            os.startfile(log_path)
-        else:
-            messagebox.showinfo("操作日志", "暂无操作日志")
+        """Open the in-app read-only log viewer."""
+        self._switch_module("audit")
 
     def _on_window_close(self):
         """窗口关闭事件处理"""

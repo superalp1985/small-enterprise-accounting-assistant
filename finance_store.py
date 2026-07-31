@@ -470,6 +470,48 @@ class FinanceDataStore:
             self._write_database_document(path.name, payload)
             self._write_json_mirror(path, payload)
 
+    def _write_json_documents(self, documents: Dict[Path, Any]):
+        """Commit related accounting documents in one SQLite transaction."""
+        with self._lock:
+            encoded = {}
+            for path, payload in documents.items():
+                if path.name not in self.DATA_FILES:
+                    raise ValueError(f"不支持的账套数据文件：{path.name}")
+                payload_text = json.dumps(
+                    payload, ensure_ascii=False, separators=(",", ":")
+                )
+                encoded[path] = (
+                    payload_text,
+                    hashlib.sha256(payload_text.encode("utf-8")).hexdigest(),
+                )
+
+            if self._db is not None:
+                with self._db:
+                    for path, (payload_text, checksum) in encoded.items():
+                        self._db.execute(
+                            """
+                            INSERT INTO documents(name, payload, checksum, updated_at)
+                            VALUES(?, ?, ?, ?)
+                            ON CONFLICT(name) DO UPDATE SET
+                                payload=excluded.payload,
+                                checksum=excluded.checksum,
+                                updated_at=excluded.updated_at
+                            """,
+                            (path.name, payload_text, checksum, _now()),
+                        )
+
+            mirror_errors = []
+            for path, payload in documents.items():
+                try:
+                    self._write_json_mirror(path, payload)
+                except OSError as exc:
+                    mirror_errors.append(f"{path.name}: {exc}")
+            if mirror_errors:
+                self.recovery_notice = (
+                    "账套已写入SQLite，但部分JSON镜像稍后需要自动修复："
+                    + "；".join(mirror_errors)
+                )
+
     def get_settings(self) -> Dict[str, Any]:
         stored = self._read_json(self.settings_path, {})
         merged = self.default_settings()
@@ -482,10 +524,36 @@ class FinanceDataStore:
         export["default_dir"] = self._portable_export_dir_value(
             export.get("default_dir")
         )
+        self._enforce_fixed_scope(merged)
         # Policy sources are maintained with the release, while tax parameters
         # remain editable per account set.
         merged["policy_sources"] = [dict(source) for source in POLICY_SOURCES]
         return merged
+
+    def _enforce_fixed_scope(self, settings: Dict[str, Any]):
+        """Keep product-scope choices out of per-company configuration."""
+        if not self.is_enterprise:
+            return
+        company = dict(settings.get("company", {}))
+        company["name"] = str(company.get("name", "")).strip()
+        company["credit_code"] = "".join(
+            str(company.get("credit_code", "")).upper().split()
+        )
+        company["taxpayer_type"] = "小规模纳税人"
+        company["currency"] = "人民币"
+        settings["company"] = company
+
+        tax = dict(settings.get("tax", {}))
+        tax["small_low_profit"] = True
+        tax["invoice_required"] = True
+        tax["input_vat_deductible"] = False
+        settings["tax"] = tax
+
+        accounting = dict(settings.get("accounting", {}))
+        accounting["standard"] = self.accounting_standard
+        accounting["fiscal_year_start"] = "01-01"
+        accounting["auto_backup"] = True
+        settings["accounting"] = accounting
 
     def enabled_account_codes(self) -> List[str]:
         template = str(
@@ -505,6 +573,7 @@ class FinanceDataStore:
 
     def save_settings(self, settings: Dict[str, Any]):
         settings = dict(settings)
+        self._enforce_fixed_scope(settings)
         accounting = dict(settings.get("accounting", {}))
         accounting["standard"] = self.accounting_standard
         opening_date = str(accounting.get("opening_date", "")).strip()
@@ -743,6 +812,67 @@ class FinanceDataStore:
         self._write_json(self.ledger_path, ledger)
         return added
 
+    def post_invoice_vouchers(
+        self, entries: Iterable[Dict[str, Any]],
+    ) -> List[Dict[str, Any]]:
+        """Atomically add one or more voucher groups and their invoice records."""
+        with self._lock:
+            ledger = self.list_vouchers(include_unposted=True)
+            invoices = self.list_invoices()
+            sequence_by_period: Dict[str, int] = {}
+            for record in ledger:
+                voucher_no = str(record.get("voucher_no", ""))
+                period = str(record.get("date", ""))[:7].replace("-", "")
+                prefix = f"{period}-"
+                if not voucher_no.startswith(prefix):
+                    continue
+                try:
+                    sequence_by_period[period] = max(
+                        sequence_by_period.get(period, 0),
+                        int(voucher_no.rsplit("-", 1)[1]),
+                    )
+                except (IndexError, ValueError):
+                    continue
+
+            results = []
+            for entry in entries:
+                voucher_date = str(entry.get("voucher_date") or _today())
+                try:
+                    datetime.strptime(voucher_date, "%Y-%m-%d")
+                except ValueError as exc:
+                    raise ValueError("凭证日期应为 YYYY-MM-DD 格式") from exc
+                self._assert_period_editable(voucher_date[:7])
+                period = voucher_date[:7].replace("-", "")
+                sequence_by_period[period] = sequence_by_period.get(period, 0) + 1
+                voucher_no = str(entry.get("voucher_no") or (
+                    f"{period}-{sequence_by_period[period]:04d}"
+                ))
+                added = self._normalize_voucher_lines(
+                    entry.get("lines", []), voucher_no, voucher_date
+                )
+                normalized_invoice, invoices = self._prepare_invoice_record(
+                    entry.get("invoice", {}), invoices
+                )
+                ledger.extend(added)
+                results.append({
+                    "voucher_no": voucher_no,
+                    "lines": added,
+                    "invoice": normalized_invoice,
+                })
+
+            if not results:
+                return []
+            ledger.sort(key=lambda row: (
+                str(row.get("date", "")),
+                str(row.get("voucher_no", "")),
+                int(row.get("line_no", 0)),
+            ))
+            self._write_json_documents({
+                self.ledger_path: ledger,
+                self.invoices_path: invoices,
+            })
+            return results
+
     def replace_voucher_group(self, voucher_no: str,
                               lines: Iterable[Dict[str, Any]],
                               voucher_date: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -902,8 +1032,10 @@ class FinanceDataStore:
     def list_invoices(self) -> List[Dict[str, Any]]:
         return [dict(record) for record in self._read_json(self.invoices_path, [])]
 
-    def upsert_invoice(self, invoice: Dict[str, Any]) -> Dict[str, Any]:
-        records = self.list_invoices()
+    def _prepare_invoice_record(
+        self, invoice: Dict[str, Any], records: List[Dict[str, Any]],
+    ) -> tuple[Dict[str, Any], List[Dict[str, Any]]]:
+        records = [dict(record) for record in records]
         normalized = dict(invoice)
         normalized.setdefault("id", uuid.uuid4().hex)
         normalized.setdefault("invoice_type", "进项")
@@ -981,6 +1113,12 @@ class FinanceDataStore:
             str(row.get("invoice_date", "")), str(row.get("invoice_type", "")),
             str(row.get("invoice_no", "")),
         ))
+        return normalized, records
+
+    def upsert_invoice(self, invoice: Dict[str, Any]) -> Dict[str, Any]:
+        normalized, records = self._prepare_invoice_record(
+            invoice, self.list_invoices()
+        )
         self._write_json(self.invoices_path, records)
         return normalized
 
@@ -1102,23 +1240,43 @@ class FinanceDataStore:
         return [dict(record) for record in self._read_json(self.drafts_path, [])]
 
     def add_draft(self, draft: Dict[str, Any]) -> Dict[str, Any]:
+        return self.add_drafts([draft])[0]
+
+    def add_drafts(self, records: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Atomically upsert multiple drafts with one data-file write."""
         drafts = self.list_drafts()
-        record = dict(draft)
-        record.setdefault("id", uuid.uuid4().hex)
-        record["saved_at"] = _now()
-        for index, existing in enumerate(drafts):
-            if existing.get("id") == record["id"]:
-                drafts[index] = record
-                break
-        else:
-            drafts.append(record)
-        self._write_json(self.drafts_path, drafts)
-        return record
+        index_by_id = {
+            str(existing.get("id", "")): index
+            for index, existing in enumerate(drafts)
+            if existing.get("id")
+        }
+        saved = []
+        saved_at = _now()
+        for draft in records:
+            record = dict(draft)
+            record.setdefault("id", uuid.uuid4().hex)
+            record["saved_at"] = saved_at
+            record_id = str(record["id"])
+            if record_id in index_by_id:
+                drafts[index_by_id[record_id]] = record
+            else:
+                index_by_id[record_id] = len(drafts)
+                drafts.append(record)
+            saved.append(record)
+        if saved:
+            self._write_json(self.drafts_path, drafts)
+        return saved
 
     def delete_draft(self, draft_id: str):
+        self.delete_drafts([draft_id])
+
+    def delete_drafts(self, draft_ids: Iterable[str]):
+        ids = {str(draft_id) for draft_id in draft_ids if draft_id}
+        if not ids:
+            return
         self._write_json(
             self.drafts_path,
-            [draft for draft in self.list_drafts() if draft.get("id") != draft_id],
+            [draft for draft in self.list_drafts() if str(draft.get("id")) not in ids],
         )
 
     def list_opening_balances(self, period: Optional[str] = None) -> List[Dict[str, Any]]:

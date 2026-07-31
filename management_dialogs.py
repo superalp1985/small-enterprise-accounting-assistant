@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import re
 import shutil
 import tkinter as tk
 from datetime import datetime
@@ -23,6 +24,24 @@ FONT = ("微软雅黑", 10)
 FONT_B = ("微软雅黑", 10, "bold")
 FONT_T = ("微软雅黑", 14, "bold")
 FONT_S = ("微软雅黑", 9)
+
+
+def normalize_credit_code(value: Any) -> str:
+    """Normalize a unified social credit code without accepting hidden spaces."""
+    return re.sub(r"\s+", "", str(value or "")).upper()
+
+
+def company_profile_errors(settings: Dict[str, Any]) -> list[str]:
+    company = settings.get("company", {})
+    errors = []
+    if not str(company.get("name", "")).strip():
+        errors.append("请填写企业名称")
+    credit_code = normalize_credit_code(company.get("credit_code", ""))
+    if not credit_code:
+        errors.append("请填写统一社会信用代码/税号")
+    elif not re.fullmatch(r"[0-9A-Z]{18}", credit_code):
+        errors.append("统一社会信用代码/税号应为18位数字或大写英文字母")
+    return errors
 
 
 def make_btn(parent, text, command, color=BLUE, width=10):
@@ -84,32 +103,54 @@ def show_legal_notice(parent, settings: Optional[Dict[str, Any]] = None):
 class SettingsDialog:
     """Company, tax, accounting, and export settings editor."""
 
-    def __init__(self, parent, store, on_saved: Optional[Callable] = None):
+    def __init__(self, parent, store, on_saved: Optional[Callable] = None,
+                 first_run: bool = False,
+                 on_cancel: Optional[Callable] = None):
         self.parent = parent
         self.store = store
         self.on_saved = on_saved
+        self.first_run = first_run
+        self.on_cancel = on_cancel
         self.settings = store.get_settings()
         self.vars: Dict[str, tk.Variable] = {}
         self.widgets: Dict[str, tk.Widget] = {}
         self.window = tk.Toplevel(parent)
-        self.window.title("系统设置")
+        self.window.title("首次设置企业资料" if first_run else "系统设置")
         self.window.configure(bg=BG)
         self.window.geometry("820x680")
-        self.window.minsize(720, 620)
+        self.window.minsize(700, 560)
         self.window.transient(parent)
         self.window.grab_set()
         self._build()
+        self.window.protocol("WM_DELETE_WINDOW", self._cancel)
+        self.window.bind("<Control-Return>", lambda _event: self._save())
 
     def _build(self):
         header = tk.Frame(self.window, bg=DARK, padx=18, pady=14)
         header.pack(fill="x")
-        tk.Label(header, text="系统设置", font=FONT_T, bg=DARK, fg=WHITE).pack(
+        title = "首次设置企业资料" if self.first_run else "系统设置"
+        tk.Label(header, text=title, font=FONT_T, bg=DARK, fg=WHITE).pack(
             side="left"
         )
         tk.Label(
             header, text=self.store.profile_label, font=FONT_S,
             bg=DARK, fg="#B8D9F2",
         ).pack(side="right")
+
+        # The action bar is packed first at the bottom so display scaling cannot
+        # push the confirmation button outside the window.
+        footer = tk.Frame(self.window, bg=BG)
+        footer.pack(side="bottom", fill="x", padx=16, pady=(0, 16))
+        cancel_text = "退出程序" if self.first_run else "取消"
+        self.cancel_button = make_btn(
+            footer, cancel_text, self._cancel, color="#666", width=9
+        )
+        self.cancel_button.pack(side="right", padx=(6, 0))
+        save_text = "确认并进入" if self.first_run else "确认修改"
+        self.save_button = make_btn(
+            footer, save_text, self._save, color=GREEN, width=11
+        )
+        self.save_button.pack(side="right")
 
         notebook = ttk.Notebook(self.window)
         notebook.pack(fill="both", expand=True, padx=16, pady=14)
@@ -118,16 +159,17 @@ class SettingsDialog:
         accounting_tab = tk.Frame(notebook, bg=BG)
         export_tab = tk.Frame(notebook, bg=BG)
         policy_tab = tk.Frame(notebook, bg=BG)
-        notebook.add(company_tab, text="企业/单位资料")
-        notebook.add(tax_tab, text="税务参数")
-        notebook.add(accounting_tab, text="核算参数")
-        notebook.add(export_tab, text="导出设置")
-        notebook.add(policy_tab, text="政策与边界")
+        notebook.add(company_tab, text="企业资料")
+        if not self.first_run:
+            notebook.add(tax_tab, text="税务参数")
+            notebook.add(accounting_tab, text="核算参数")
+            notebook.add(export_tab, text="导出设置")
+            notebook.add(policy_tab, text="政策与边界")
 
         company_fields = [
             ("company.name", "企业/单位名称", None),
             ("company.credit_code", "统一社会信用代码", None),
-            ("company.taxpayer_type", "纳税人类型", ["小规模纳税人", "一般纳税人", "非企业单位"]),
+            ("company.taxpayer_type", "纳税人类型", "fixed"),
             ("company.industry", "所属行业", None),
             ("company.legal_representative", "法定代表人/负责人", None),
             ("company.finance_contact", "财务联系人", None),
@@ -135,10 +177,24 @@ class SettingsDialog:
             ("company.registered_address", "注册地址", None),
             ("company.bank_name", "开户银行", None),
             ("company.bank_account", "银行账号", None),
-            ("company.currency", "记账本位币", ["人民币"]),
+            ("company.currency", "记账本位币", "fixed"),
         ]
         for row, (key, label, options) in enumerate(company_fields):
             self._add_field(company_tab, row, key, label, options)
+        company_notice = (
+            "请填写企业名称和统一社会信用代码，然后点击右下角“确认并进入”。"
+            if self.first_run else
+            "企业名称和税号修改后，请点击右下角“确认修改”；保存后会同步刷新当前账套。"
+        )
+        tk.Label(
+            company_tab,
+            text=company_notice + "\n本版本固定适用于小规模纳税人、小型微利企业和人民币记账。",
+            font=FONT_S, bg="#EAF4FB", fg="#163A5F", anchor="w",
+            justify="left", wraplength=700, padx=10, pady=8,
+        ).grid(
+            row=len(company_fields), column=0, columnspan=2,
+            sticky="ew", padx=16, pady=(10, 6),
+        )
 
         tax_fields = [
             ("tax.vat_filing_frequency", "增值税申报频率", ["按月", "按季"]),
@@ -149,9 +205,9 @@ class SettingsDialog:
             ("tax.cit_rate", "所得税测算有效税率（%）", "percent"),
             ("tax.stamp_duty_filing_frequency", "印花税申报频率", ["按月", "按季"]),
             ("tax.stamp_duty_relief_rate", "印花税减征后比例（%）", "percent"),
-            ("tax.small_low_profit", "符合小型微利企业条件", "bool"),
-            ("tax.invoice_required", "成本费用需要合规扣除凭证", "bool"),
-            ("tax.input_vat_deductible", "允许抵扣合规进项税额", "bool"),
+            ("tax.small_low_profit", "产品适用范围：小型微利企业", "fixed"),
+            ("tax.invoice_required", "成本费用需要合规扣除凭证", "fixed"),
+            ("tax.input_vat_deductible", "小规模纳税人不抵扣进项税额", "fixed"),
         ]
         for row, (key, label, kind) in enumerate(tax_fields):
             self._add_field(tax_tab, row, key, label, kind)
@@ -195,12 +251,13 @@ class SettingsDialog:
         ).grid(row=len(policy_fields) + 1, column=1, sticky="e", padx=12, pady=8)
 
         accounting_fields = [
+            ("accounting.standard", "会计准则", "fixed"),
             ("accounting.account_template", "科目启用模板", template_labels(self.store.account_catalog)),
             ("accounting.opening_date", "开账日期（YYYY-MM-DD）", None),
-            ("accounting.fiscal_year_start", "会计年度起始（月-日）", None),
+            ("accounting.fiscal_year_start", "会计年度起始（月-日）", "fixed"),
             ("accounting.default_cash_subject", "默认结算科目", None),
             ("accounting.default_payable_subject", "默认应付科目", None),
-            ("accounting.auto_backup", "每次启动自动备份（保留最近5份）", "bool"),
+            ("accounting.auto_backup", "每次启动自动备份（保留最近5份）", "fixed"),
         ]
         for row, (key, label, kind) in enumerate(accounting_fields):
             self._add_field(accounting_tab, row, key, label, kind)
@@ -228,13 +285,6 @@ class SettingsDialog:
         )
         export_entry.configure(width=48)
 
-        footer = tk.Frame(self.window, bg=BG)
-        footer.pack(fill="x", padx=16, pady=(0, 16))
-        make_btn(footer, "取消", self.window.destroy, color="#666", width=9).pack(
-            side="right", padx=(6, 0)
-        )
-        make_btn(footer, "保存设置", self._save, color=GREEN, width=11).pack(side="right")
-
     def _get_value(self, key: str):
         section, field = key.split(".", 1)
         return self.settings.get(section, {}).get(field, "")
@@ -244,7 +294,11 @@ class SettingsDialog:
             row=row, column=0, sticky="w", padx=(18, 12), pady=7
         )
         value = self._get_value(key)
-        if kind == "bool":
+        if kind == "fixed":
+            display = "是（固定）" if value is True else "否（固定）" if value is False else f"{value}（固定）"
+            var = tk.StringVar(value=display)
+            widget = ttk.Entry(parent, textvariable=var, state="readonly", font=FONT)
+        elif kind == "bool":
             var = tk.BooleanVar(value=bool(value))
             widget = ttk.Checkbutton(parent, variable=var, text="启用")
         else:
@@ -258,7 +312,8 @@ class SettingsDialog:
                 widget = tk.Entry(parent, textvariable=var, font=FONT, relief="solid", bd=1)
         widget.grid(row=row, column=1, sticky="ew", padx=(0, 12), pady=7)
         parent.columnconfigure(1, weight=1)
-        self.vars[key] = var
+        if kind != "fixed":
+            self.vars[key] = var
         self.widgets[key] = widget
 
     def _choose_directory(self, key: str):
@@ -338,22 +393,34 @@ class SettingsDialog:
                     return
             updated.setdefault(section, {})[field] = value
 
-        credit_code = str(updated["company"].get("credit_code", "")).strip()
-        if credit_code and len(credit_code) != 18:
-            if not messagebox.askyesno(
-                "资料提示", "统一社会信用代码通常为18位，仍要保存当前内容吗？",
-                parent=self.window,
-            ):
-                return
+        updated["company"]["name"] = str(
+            updated["company"].get("name", "")
+        ).strip()
+        updated["company"]["credit_code"] = normalize_credit_code(
+            updated["company"].get("credit_code", "")
+        )
+        profile_errors = company_profile_errors(updated)
+        if profile_errors:
+            messagebox.showwarning(
+                "企业资料未完成", "\n".join(profile_errors), parent=self.window
+            )
+            return
         try:
             self.store.save_settings(updated)
         except Exception as exc:
             messagebox.showerror("无法保存", str(exc), parent=self.window)
             return
-        if self.on_saved:
-            self.on_saved(updated)
+        persisted = self.store.get_settings()
         self.window.destroy()
-        messagebox.showinfo("保存成功", "系统设置已保存到当前账套", parent=self.parent)
+        message = "企业资料已保存并同步到当前账套" if self.first_run else "系统设置已保存并同步到当前账套"
+        messagebox.showinfo("保存成功", message, parent=self.parent)
+        if self.on_saved:
+            self.on_saved(persisted)
+
+    def _cancel(self):
+        self.window.destroy()
+        if self.on_cancel:
+            self.on_cancel()
 
     @staticmethod
     def _label_for(key: str) -> str:
@@ -573,8 +640,10 @@ class ArchiveManagerDialog:
             messagebox.showerror("删除失败", str(exc), parent=self.window)
 
 
-def show_settings(parent, store, on_saved: Optional[Callable] = None):
-    return SettingsDialog(parent, store, on_saved)
+def show_settings(parent, store, on_saved: Optional[Callable] = None,
+                  first_run: bool = False,
+                  on_cancel: Optional[Callable] = None):
+    return SettingsDialog(parent, store, on_saved, first_run, on_cancel)
 
 
 def show_archive_manager(parent, store, on_restored: Optional[Callable] = None):

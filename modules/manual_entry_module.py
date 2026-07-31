@@ -238,6 +238,33 @@ class ManualEntryModule(tk.Frame):
         input_frame.columnconfigure(1, weight=1)
         input_frame.columnconfigure(3, weight=1)
 
+        invoice_direction_frame = tk.Frame(f, bg=BG)
+        invoice_direction_frame.pack(fill="x", padx=20, pady=(0, 4))
+        tk.Label(
+            invoice_direction_frame,
+            text="票据方向（进项/销项）：",
+            font=FONT_B,
+            bg=BG,
+        ).pack(side="left")
+        self.invoice_type_var = tk.StringVar(value="进项")
+        self.entry_invoice_type = ttk.Combobox(
+            invoice_direction_frame,
+            textvariable=self.invoice_type_var,
+            values=["进项", "销项"],
+            font=FONT,
+            width=12,
+            state="readonly",
+        )
+        self.entry_invoice_type.pack(side="left", padx=(6, 16))
+        self.entry_invoice_type.bind("<<ComboboxSelected>>", self._sync_invoice_direction)
+        tk.Label(
+            invoice_direction_frame,
+            text="进项=购进取得；销项=销售开具或未开票销售收入",
+            font=FONT_S,
+            bg=BG,
+            fg="#666",
+        ).pack(side="left")
+
         # 凭证列表
         list_frame = tk.LabelFrame(f, text=" 已保存凭证分录 ", font=FONT_B,
                                     bg=BG, fg=DARK, bd=1, relief="groove")
@@ -272,6 +299,11 @@ class ManualEntryModule(tk.Frame):
         self.tree.bind("<ButtonRelease-1>", self._on_tree_click)
 
         self._checked_ids = set()
+
+    def _sync_invoice_direction(self, _event=None):
+        invoice_type = self.entry_invoice_type.get().strip()
+        if invoice_type in {"进项", "销项"}:
+            self.entry_dir.set("贷方" if invoice_type == "销项" else "借方")
 
     def _on_match(self):
         """执行智能匹配"""
@@ -585,6 +617,7 @@ class ManualEntryModule(tk.Frame):
         counter_subject = self.counter_subject_var.get().strip()
         amount_str = self.entry_amount.get().strip()
         direction = self.entry_dir.get()
+        invoice_type = self.entry_invoice_type.get().strip()
 
         if not desc or not subject or not counter_subject or not amount_str:
             messagebox.showwarning("提示", "请填写摘要、科目、对方科目和金额")
@@ -609,6 +642,7 @@ class ManualEntryModule(tk.Frame):
             def proceed():
                 self._add_voucher(
                     desc, subject, counter_subject, amount, direction,
+                    invoice_type,
                     self.voucher_date_var.get().strip(),
                     self.invoice_no_var.get().strip(),
                     self.counterparty_var.get().strip(),
@@ -622,6 +656,7 @@ class ManualEntryModule(tk.Frame):
             # 没有找到法律依据，直接添加
             self._add_voucher(
                 desc, subject, counter_subject, amount, direction,
+                invoice_type,
                 self.voucher_date_var.get().strip(),
                 self.invoice_no_var.get().strip(),
                 self.counterparty_var.get().strip(),
@@ -667,7 +702,8 @@ class ManualEntryModule(tk.Frame):
         d.geometry(f"+{x}+{y}")
 
     def _add_voucher(self, desc: str, subject: str, counter_subject: str,
-                     amount: float, direction: str, voucher_date: str,
+                     amount: float, direction: str, invoice_type: str,
+                     voucher_date: str,
                      invoice_no: str = "", counterparty: str = "",
                      tax_amount: float = 0.0):
         """Persist a balanced voucher, separating output VAT when supplied."""
@@ -675,6 +711,8 @@ class ManualEntryModule(tk.Frame):
         primary_credit = amount if direction == "贷方" else 0.0
         code = subject.split(" ", 1)[0]
         is_revenue = code in {"5001", "5051", "5111", "5301"}
+        invoice_type = invoice_type if invoice_type in {"进项", "销项"} else "进项"
+        is_output_invoice = invoice_type == "销项"
         common = {
             "摘要": desc,
             "date": voucher_date,
@@ -718,8 +756,8 @@ class ManualEntryModule(tk.Frame):
             if self.store:
                 added = self.store.add_voucher_lines(lines, voucher_date=voucher_date)
                 document_type = (
-                    "未开票收入" if is_revenue and "未开票" in desc else
-                    "红字发票" if is_revenue and any(word in desc for word in ("红字", "红票", "冲红")) else
+                    "未开票收入" if is_output_invoice and "未开票" in desc else
+                    "红字发票" if is_output_invoice and any(word in desc for word in ("红字", "红票", "冲红")) else
                     "正常发票"
                 )
                 if invoice_no or document_type == "未开票收入":
@@ -727,19 +765,19 @@ class ManualEntryModule(tk.Frame):
                     self.store.upsert_invoice({
                         "invoice_no": invoice_no,
                         "invoice_date": voucher_date,
-                        "invoice_type": "销项" if is_revenue else "进项",
+                        "invoice_type": invoice_type,
                         "document_type": document_type,
                         "invoice_form": (
                             "增值税专用发票" if "专票" in desc else
                             "无票" if document_type == "未开票收入" else "普通发票"
                         ),
                         "price_tax_mode": "含税",
-                        "seller": counterparty if not is_revenue else settings["company"].get("name", ""),
-                        "buyer": settings["company"].get("name", "") if not is_revenue else counterparty,
+                        "seller": settings["company"].get("name", "") if is_output_invoice else counterparty,
+                        "buyer": counterparty if is_output_invoice else settings["company"].get("name", ""),
                         "amount": max(0.0, amount - tax_amount),
                         "tax_amount": tax_amount,
                         "total_amount": amount,
-                        "deductible": bool(settings["tax"].get("input_vat_deductible") and not is_revenue),
+                        "deductible": bool(settings["tax"].get("input_vat_deductible") and not is_output_invoice),
                         "status": "已确认",
                         "source": "manual",
                     })
@@ -777,6 +815,7 @@ class ManualEntryModule(tk.Frame):
             "counter_subject": self.counter_subject_var.get().strip(),
             "amount": self.entry_amount.get().strip(),
             "direction": self.entry_dir.get(),
+            "invoice_type": self.entry_invoice_type.get().strip(),
             "voucher_date": self.voucher_date_var.get().strip(),
             "invoice_no": self.invoice_no_var.get().strip(),
             "counterparty": self.counterparty_var.get().strip(),
@@ -851,6 +890,7 @@ class ManualEntryModule(tk.Frame):
         self.entry_amount.delete(0, "end")
         self.entry_amount.insert(0, draft.get("amount", ""))
         self.entry_dir.set(draft.get("direction", "借方"))
+        self.entry_invoice_type.set(draft.get("invoice_type", "进项"))
         self.voucher_date_var.set(draft.get("voucher_date", datetime.now().strftime("%Y-%m-%d")))
         self.invoice_no_var.set(draft.get("invoice_no", ""))
         self.counterparty_var.set(draft.get("counterparty", ""))
@@ -863,6 +903,7 @@ class ManualEntryModule(tk.Frame):
         self.entry_amount.delete(0, "end")
         self.subject_var.set("")
         self.entry_dir.current(0)
+        self.entry_invoice_type.set("进项")
         self.invoice_no_var.set("")
         self.counterparty_var.set("")
         self.tax_amount_var.set("0")
