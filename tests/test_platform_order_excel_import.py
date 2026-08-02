@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import multiprocessing
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
 from openpyxl import Workbook
 
 from finance_store import FinanceDataStore
-from modules.batch_import_module import BatchImportModule
+from modules.batch_import_module import BatchImportModule, _parse_excel_in_subprocess
 from platform_order_excel_import import (
     PlatformOrderExcelImportError,
     read_platform_order_workbook,
@@ -109,6 +111,44 @@ class PlatformOrderExcelImportTests(unittest.TestCase):
         workbook.save(self.path)
         with self.assertRaises(PlatformOrderExcelImportError):
             read_platform_order_workbook(self.path)
+
+    def test_packaged_parser_contract_uses_spawn_safe_messages(self):
+        self._write_workbook()
+        context = multiprocessing.get_context("spawn")
+        receiver, sender = context.Pipe(duplex=False)
+        process = context.Process(
+            target=_parse_excel_in_subprocess,
+            args=(sender, str(self.path), "", "电商与网络零售", "测试茶业有限公司"),
+        )
+        process.start()
+        sender.close()
+        result = None
+        error = None
+        deadline = time.monotonic() + 20
+        try:
+            while time.monotonic() < deadline:
+                if receiver.poll(0.1):
+                    event = receiver.recv()
+                    if event[0] == "result":
+                        result = event[1]
+                        break
+                    if event[0] == "error":
+                        error = event[1]
+                        break
+                elif not process.is_alive():
+                    break
+        finally:
+            receiver.close()
+            process.join(timeout=5)
+            if process.is_alive():
+                process.terminate()
+                process.join(timeout=2)
+
+        self.assertIsNone(error)
+        self.assertEqual(process.exitcode, 0)
+        self.assertIsNotNone(result)
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0]["invoice_no"], "ORDER-001")
 
 
 if __name__ == "__main__":

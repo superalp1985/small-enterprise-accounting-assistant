@@ -10,6 +10,7 @@ batch_import_module.py - 批量导入模块
 """
 
 import json
+import multiprocessing
 import queue
 import threading
 import traceback
@@ -53,6 +54,48 @@ from platform_order_excel_import import (
     PlatformOrderExcelImportError,
     read_platform_order_workbook,
 )
+
+
+def _parse_excel_in_subprocess(
+    connection,
+    filepath: str,
+    company_tax_id: str,
+    company_industry: str,
+    company_name: str,
+) -> None:
+    """Parse Excel away from Tk so parser GC cannot enter the Tcl runtime."""
+    source = Path(filepath)
+
+    def report_progress(current: int, total: int, stage: str) -> None:
+        connection.send(("progress", current, total, stage))
+
+    try:
+        try:
+            items = read_tax_invoice_workbook(
+                source,
+                company_tax_id=company_tax_id,
+                company_industry=company_industry,
+                progress_callback=report_progress,
+            )
+        except InvoiceExcelImportError as invoice_error:
+            try:
+                items = read_platform_order_workbook(
+                    source,
+                    company_name=company_name,
+                    company_industry=company_industry,
+                    progress_callback=report_progress,
+                )
+            except PlatformOrderExcelImportError:
+                raise invoice_error
+        connection.send(("result", items))
+    except BaseException as exc:
+        connection.send((
+            "error",
+            f"{exc.__class__.__name__}: {exc}",
+            traceback.format_exc(),
+        ))
+    finally:
+        connection.close()
 
 
 def make_btn(parent, text, cmd, color=BLUE, width=12):
@@ -762,25 +805,12 @@ class BatchImportModule(tk.Frame):
                 try:
                     source = Path(filepath)
                     if source.suffix.lower() in {".xls", ".xlsx", ".xlsm"}:
-                        try:
-                            items = read_tax_invoice_workbook(
-                                source,
-                                company_tax_id=company_tax_id,
-                                company_industry=company_industry,
-                                progress_callback=lambda current, count, stage, name=source.name:
-                                self._queue_import_progress(current, count, stage, name),
-                            )
-                        except InvoiceExcelImportError as invoice_error:
-                            try:
-                                items = read_platform_order_workbook(
-                                    source,
-                                    company_name=str(company.get("name", "")),
-                                    company_industry=company_industry,
-                                    progress_callback=lambda current, count, stage, name=source.name:
-                                    self._queue_import_progress(current, count, stage, name),
-                                )
-                            except PlatformOrderExcelImportError:
-                                raise invoice_error
+                        items = self._read_excel_in_subprocess(
+                            source,
+                            company_tax_id=company_tax_id,
+                            company_industry=company_industry,
+                            company_name=str(company.get("name", "")),
+                        )
                     else:
                         self._queue_import_progress(0, 1, "正在进行 OCR 识别", source.name)
                         items = [self.ocr_service.recognize_invoice(source)]
@@ -836,6 +866,70 @@ class BatchImportModule(tk.Frame):
         self._recognition_ui_active = True
         self._start_recognition_ui_pump()
         self._recognition_thread.start()
+
+    def _read_excel_in_subprocess(
+        self,
+        source: Path,
+        company_tax_id: str,
+        company_industry: str,
+        company_name: str,
+    ) -> List[Dict[str, Any]]:
+        """Run openpyxl/xlrd in a spawned process, isolated from Tk/Tcl."""
+        context = multiprocessing.get_context("spawn")
+        receiver, sender = context.Pipe(duplex=False)
+        process = context.Process(
+            target=_parse_excel_in_subprocess,
+            args=(
+                sender,
+                str(source),
+                company_tax_id,
+                company_industry,
+                company_name,
+            ),
+            name="batch-excel-parser",
+            daemon=True,
+        )
+        process.start()
+        sender.close()
+        result = None
+        failure = None
+        failure_detail = ""
+        try:
+            while True:
+                if self._cancel_event.is_set():
+                    process.terminate()
+                    raise RuntimeError("用户已取消 Excel 解析")
+                if receiver.poll(0.1):
+                    try:
+                        event = receiver.recv()
+                    except EOFError:
+                        break
+                    kind = event[0]
+                    if kind == "progress":
+                        self._queue_import_progress(*event[1:], source.name)
+                    elif kind == "result":
+                        result = event[1]
+                        break
+                    elif kind == "error":
+                        failure = event[1]
+                        failure_detail = event[2]
+                        break
+                elif not process.is_alive():
+                    break
+
+            process.join(timeout=5)
+            if result is not None:
+                return result
+            if failure:
+                raise RuntimeError(f"{failure}\n{failure_detail}")
+            raise RuntimeError(
+                f"Excel 解析进程异常退出，退出码：{process.exitcode}"
+            )
+        finally:
+            receiver.close()
+            if process.is_alive():
+                process.terminate()
+                process.join(timeout=2)
 
     def _show_source_progress(self, current: int, total: int, file_name: str):
         self.progress_var.set(min(95.0, 35.0 + (current / max(total, 1) * 60.0)))

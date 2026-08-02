@@ -11,6 +11,7 @@ import sys
 import json
 import atexit
 import faulthandler
+import multiprocessing
 import threading
 import traceback
 from pathlib import Path
@@ -911,6 +912,7 @@ def run_full_cycle_test() -> int:
 
 
 if __name__ == "__main__":
+    multiprocessing.freeze_support()
     if "--smoke-test" in sys.argv:
         raise SystemExit(run_packaged_smoke_test())
     if "--full-cycle-test" in sys.argv:

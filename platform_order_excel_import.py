@@ -131,7 +131,15 @@ def read_platform_order_workbook(
     if source.suffix.lower() not in {".xlsx", ".xlsm"}:
         raise PlatformOrderExcelImportError("仅支持平台导出的 .xlsx 或 .xlsm 文件")
     try:
-        workbook = load_workbook(source, read_only=True, data_only=True)
+        # Platform exports are small enough to load eagerly.  The read-only
+        # worksheet iterator can keep the XML parser alive while the Tk review
+        # queue is being drained, which is unstable in the frozen Windows build.
+        workbook = load_workbook(
+            source,
+            read_only=False,
+            data_only=True,
+            keep_links=False,
+        )
     except Exception as exc:
         raise PlatformOrderExcelImportError(f"无法读取平台订单 Excel：{exc}") from exc
 
